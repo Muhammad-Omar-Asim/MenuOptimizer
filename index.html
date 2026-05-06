@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menu JSON Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f7f6f2;
+      --surface: #ffffff;
+      --surface2: #f0efe9;
+      --border: #e2e0d8;
+      --border2: #cccab8;
+      --text: #1a1917;
+      --text2: #6b6960;
+      --text3: #9e9c93;
+      --accent: #2a5cff;
+      --accent-bg: #eef1ff;
+      --danger: #c0392b;
+      --danger-bg: #fdf0ef;
+      --success: #1a6c3d;
+      --success-bg: #edfaf3;
+      --warn: #8a5a00;
+      --warn-bg: #fff8e6;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .page { max-width: 760px; margin: 0 auto; }
+
+    header { margin-bottom: 2.5rem; }
+
+    header h1 {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 0.75rem;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12.5px;
+      color: var(--text);
+      outline: none;
+      height: 240px;
+      resize: vertical;
+      line-height: 1.65;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(42, 92, 255, 0.1);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 1rem;
+      padding: 11px 24px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .error {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: var(--danger-bg);
+      border: 1px solid #f5c6c2;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--danger);
+      display: none;
+    }
+
+    #results { display: none; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+
+    .metric {
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+
+    .metric-label {
+      font-size: 11.5px;
+      color: var(--text3);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .metric-value {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .analysis-output {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.25rem;
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 80px;
+    }
+
+    .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .cursor::after {
+      content: '▋';
+      animation: blink 1s step-end infinite;
+      font-size: 12px;
+      color: var(--accent);
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 12px;
+      color: var(--text3);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header>
+      <h1>Menu JSON Analyzer</h1>
+      <p>Paste your menu JSON and get an instant AI-powered audit — item counts, image coverage, upsells, misplaced items, and navigation recommendations.</p>
+    </header>
+
+    <div class="card">
+      <div class="card-title">Menu JSON</div>
+      <label for="json-input">Paste your JSON below</label>
+      <textarea id="json-input" placeholder='{"categories": [...], "items": [...]}'></textarea>
+      <div class="error" id="error-msg"></div>
+      <button class="btn" id="analyze-btn" onclick="runAnalysis()">
+        Analyze menu
+      </button>
+    </div>
+
+    <div id="results">
+      <div class="card">
+        <div class="card-title">Summary</div>
+        <div class="metrics-grid" id="metrics-grid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Full analysis</div>
+        <div class="analysis-output cursor" id="analysis-text"></div>
+      </div>
+    </div>
+
+    <footer>Powered by Claude (Anthropic) &mdash; Flipdish menu team beta</footer>
+
+  </div>
+
+  <script>
+    async function runAnalysis() {
+      const raw = document.getElementById('json-input').value.trim();
+      const errEl = document.getElementById('error-msg');
+      const btn = document.getElementById('analyze-btn');
+
+      errEl.style.display = 'none';
+
+      if (!raw) {
+        showError('Please paste your menu JSON first.');
+        return;
+      }
+
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (e) {
+        showError('Invalid JSON — please check your input and try again. ' + e.message);
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('analysis-text').textContent = '';
+      document.getElementById('metrics-grid').innerHTML = '';
+
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ menu: parsed }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          showError('Server error ' + response.status + ': ' + (err?.error || response.statusText));
+          btn.disabled = false;
+          btn.innerHTML = 'Analyze menu';
+          return;
+        }
+
+        const analysisEl = document.getElementById('analysis-text');
+        document.getElementById('results').style.display = 'block';
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let metricsExtracted = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const lines = decoder.decode(value).split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const obj = JSON.parse(data);
+              if (obj.type === 'content_block_delta' && obj.delta?.text) {
+                fullText += obj.delta.text;
+                if (!metricsExtracted && fullText.includes('JSON>>>')) {
+                  const match = fullText.match(/<<<JSON\s*([\s\S]*?)\s*JSON>>>/);
+                  if (match) {
+                    try { renderMetrics(JSON.parse(match[1])); metricsExtracted = true; } catch (e) {}
+                  }
+                }
+                analysisEl.textContent = fullText.replace(/<<<JSON[\s\S]*?JSON>>>\n?/, '').trim();
+              }
+            } catch (e) {}
+          }
+        }
+
+        analysisEl.classList.remove('cursor');
+
+      } catch (e) {
+        showError('Network error: ' + e.message);
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = 'Analyze menu';
+    }
+
+    function renderMetrics(m) {
+      const items = [
+        { label: 'Items', value: m.items ?? '—' },
+        { label: 'Categories', value: m.categories ?? '—' },
+        { label: 'Item images', value: m.item_images ?? '—' },
+        { label: 'Category images', value: m.category_images ?? '—' },
+        { label: 'Upsells', value: m.upsells ?? '—' }
+      ];
+      document.getElementById('metrics-grid').innerHTML = items.map(i =>
+        `<div class="metric"><div class="metric-label">${i.label}</div><div class="metric-value">${i.value}</div></div>`
+      ).join('');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
