@@ -3,279 +3,662 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Menu JSON Analyzer</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <title>Menu Analyzer · Flipdish</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #f7f6f2;
-      --surface: #ffffff;
-      --surface2: #f0efe9;
-      --border: #e2e0d8;
-      --border2: #cccab8;
-      --text: #1a1917;
-      --text2: #6b6960;
-      --text3: #9e9c93;
-      --accent: #2a5cff;
-      --accent-bg: #eef1ff;
-      --danger: #c0392b;
-      --danger-bg: #fdf0ef;
-      --success: #1a6c3d;
-      --success-bg: #edfaf3;
-      --warn: #8a5a00;
-      --warn-bg: #fff8e6;
-      --radius: 10px;
-      --radius-sm: 6px;
+      --bg: #07090f;
+      --bg-2: #0c0f1a;
+      --surface: #11152099;
+      --surface-solid: #131726;
+      --pill: #1a1f2e;
+      --pill-hover: #232839;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text: #ffffff;
+      --text-2: #b5b7c9;
+      --text-3: #6b7088;
+      --cyan: #7dd3fc;
+      --purple: #a78bfa;
+      --pink: #f9a8d4;
+      --mint: #34d399;
+      --rose: #fb7185;
+      --amber: #fbbf24;
+      --primary-gradient: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 50%, #f9a8d4 100%);
+      --panel-gradient: linear-gradient(135deg, rgba(45,212,191,0.18) 0%, rgba(167,139,250,0.22) 45%, rgba(249,168,212,0.10) 75%, rgba(15,19,32,0.0) 100%);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --radius-pill: 999px;
     }
 
     body {
       font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(1100px 600px at 85% -10%, rgba(167,139,250,0.18), transparent 60%),
+        radial-gradient(900px 500px at 5% 0%, rgba(45,212,191,0.12), transparent 60%),
+        var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 2rem 1rem 4rem;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 4rem;
     }
 
-    .page { max-width: 760px; margin: 0 auto; }
+    /* Top nav */
+    .topbar {
+      max-width: 1080px; margin: 0 auto;
+      padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 8px;
+    }
 
-    header { margin-bottom: 2.5rem; }
-
-    header h1 {
-      font-size: 26px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
+    .nav-pill {
+      padding: 9px 18px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
       color: var(--text);
+      font: 600 13.5px 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .nav-pill:hover { background: var(--pill); border-color: var(--border-strong); }
+
+    .nav-pill.active {
+      background: var(--primary-gradient);
+      color: #0b0d18;
+      border-color: transparent;
+      box-shadow: 0 4px 24px rgba(167,139,250,0.35), 0 1px 0 rgba(255,255,255,0.4) inset;
     }
 
-    header p {
-      margin-top: 6px;
-      font-size: 15px;
-      color: var(--text2);
-      line-height: 1.6;
+    /* Hero */
+    .hero {
+      max-width: 1080px; margin: 0 auto;
+      padding: 1.5rem 1.5rem 1rem;
+      display: flex; align-items: center; gap: 12px;
     }
 
+    .brand-mark {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--primary-gradient);
+      display: grid; place-items: center;
+      color: #0b0d18; font-weight: 800; font-size: 16px;
+      box-shadow: 0 6px 24px rgba(125,211,252,0.30);
+    }
+
+    .brand-name {
+      font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+    }
+
+    .brand-pill {
+      margin-left: auto;
+      font-size: 11px; padding: 5px 12px;
+      background: rgba(167,139,250,0.14);
+      color: var(--purple);
+      border: 1px solid rgba(167,139,250,0.30);
+      border-radius: var(--radius-pill);
+      font-weight: 600;
+    }
+
+    /* Page */
+    .page {
+      max-width: 1080px; margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Card with iridescent gradient — uses pseudo for the gradient overlay */
     .card {
-      background: var(--surface);
+      position: relative;
+      background: var(--surface-solid);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1.5rem;
+      padding: 1.75rem;
       margin-bottom: 1.25rem;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--panel-gradient);
+      pointer-events: none;
+      z-index: -1;
+    }
+    .card::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(125,211,252,0.30), rgba(167,139,250,0.30) 50%, rgba(249,168,212,0.10) 100%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+              mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.1rem; gap: 12px;
     }
 
     .card-title {
-      font-size: 12px;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text3);
-      margin-bottom: 0.75rem;
+      font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 10px;
     }
-
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text2);
-      margin-bottom: 6px;
-    }
-
-    textarea {
-      width: 100%;
-      background: var(--surface2);
+    .card-title .step {
+      font-size: 11px; padding: 3px 9px;
+      background: rgba(255,255,255,0.06);
       border: 1px solid var(--border);
+      color: var(--text-2);
+      border-radius: var(--radius-pill); font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .card-title .emoji { font-size: 20px; }
+
+    .card-actions { display: flex; gap: 8px; }
+
+    /* Drop zone */
+    .drop-zone {
+      background: rgba(0,0,0,0.32);
+      border: 1.5px dashed var(--border-strong);
       border-radius: var(--radius-sm);
-      padding: 10px 12px;
+      padding: 22px;
+      display: flex; align-items: center; gap: 16px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .drop-zone.dragging {
+      border-color: var(--cyan);
+      background: rgba(125,211,252,0.10);
+    }
+    .drop-zone.has-file {
+      border-style: solid;
+      border-color: rgba(52,211,153,0.45);
+      background: rgba(52,211,153,0.07);
+    }
+
+    .choose-btn {
+      flex-shrink: 0;
+      padding: 11px 22px;
+      background: var(--pill);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-pill);
+      font: 600 13.5px 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .choose-btn:hover { background: var(--pill-hover); }
+    .choose-btn:active { transform: scale(0.98); }
+
+    .file-status {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text-2); font-size: 13.5px;
+    }
+    .file-status .filename {
+      color: var(--text); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-status .filesize { color: var(--text-3); font-size: 12.5px; }
+    .file-clear {
+      margin-left: auto; flex-shrink: 0;
+      background: transparent; border: none; color: var(--text-3);
+      cursor: pointer; padding: 4px 8px;
+      font: inherit; font-size: 12.5px;
+    }
+    .file-clear:hover { color: var(--rose); }
+
+    .status-line {
+      margin-top: 14px;
       font-family: 'DM Mono', monospace;
       font-size: 12.5px;
-      color: var(--text);
-      outline: none;
-      height: 240px;
-      resize: vertical;
-      line-height: 1.65;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      color: var(--mint);
+      display: flex; align-items: center; gap: 8px;
     }
+    .status-line.muted { color: var(--text-3); }
+    .status-line.error { color: var(--rose); }
+    .status-line .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-    textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(42, 92, 255, 0.1);
-    }
-
+    /* Buttons */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 1rem;
-      padding: 11px 24px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 24px;
+      background: var(--pill);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      border-radius: var(--radius-pill);
+      font: 600 14px 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
+      transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
     }
-
-    .btn:hover { opacity: 0.88; }
+    .btn:hover { background: var(--pill-hover); }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-    .error {
-      margin-top: 10px;
-      padding: 10px 14px;
-      background: var(--danger-bg);
-      border: 1px solid #f5c6c2;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      color: var(--danger);
-      display: none;
+    .btn-primary {
+      background: var(--primary-gradient);
+      color: #0b0d18;
+      border: none;
+      box-shadow: 0 6px 28px rgba(167,139,250,0.35);
+    }
+    .btn-primary:hover { box-shadow: 0 8px 36px rgba(167,139,250,0.5); }
+
+    .btn-outline-pink {
+      border-color: rgba(249,168,212,0.45);
+      color: var(--pink);
     }
 
+    .btn-row {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem;
+    }
+
+    /* Empty hint */
+    .hint {
+      margin-top: 1.25rem;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.02);
+      display: flex; gap: 12px; align-items: flex-start;
+      font-size: 13px; color: var(--text-2); line-height: 1.55;
+    }
+    .hint-icon {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: rgba(125,211,252,0.10);
+      border: 1px solid rgba(125,211,252,0.30);
+      border-radius: 8px;
+      display: grid; place-items: center;
+      color: var(--cyan);
+    }
+
+    /* Results */
     #results { display: none; }
 
     .metrics-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 10px;
-      margin-bottom: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
     }
 
     .metric {
-      background: var(--surface2);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-    }
-
-    .metric-label {
-      font-size: 11.5px;
-      color: var(--text3);
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-
-    .metric-value {
-      font-size: 26px;
-      font-weight: 600;
-      color: var(--text);
-      letter-spacing: -0.02em;
-    }
-
-    .analysis-output {
-      background: var(--surface2);
+      padding: 18px 20px;
+      background: rgba(0,0,0,0.32);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      padding: 1rem 1.25rem;
-      font-size: 14px;
+      transition: transform 0.15s, border-color 0.2s;
+    }
+    .metric:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+    .metric .icon-bubble {
+      width: 30px; height: 30px;
+      border-radius: 8px; display: grid; place-items: center;
+      margin-bottom: 14px;
+    }
+    .metric .metric-label {
+      font-size: 11px; color: var(--text-3);
+      margin-bottom: 4px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .metric .metric-value {
+      font-size: 28px; font-weight: 700; color: var(--text);
+      letter-spacing: -0.025em;
+    }
+
+    .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.12); color: var(--cyan); }
+    .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.14); color: var(--purple); }
+    .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.12);  color: var(--mint); }
+    .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.12);  color: var(--amber); }
+    .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.14); color: var(--pink); }
+
+    .analysis-output {
+      background: rgba(0,0,0,0.32);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem 1.5rem;
+      font-size: 14.5px;
       line-height: 1.8;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
+      color: var(--text-2);
+      white-space: pre-wrap; word-break: break-word;
       min-height: 80px;
     }
 
     .spinner {
-      width: 15px; height: 15px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(11,13,24,0.25);
+      border-top-color: #0b0d18;
       border-radius: 50%;
       animation: spin 0.65s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px; height: 14px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
     .cursor::after {
       content: '▋';
       animation: blink 1s step-end infinite;
       font-size: 12px;
-      color: var(--accent);
+      color: var(--cyan);
+      margin-left: 2px;
     }
     @keyframes blink { 50% { opacity: 0; } }
 
     footer {
       margin-top: 2rem;
-      font-size: 12px;
-      color: var(--text3);
-      text-align: center;
+      font-size: 12px; color: var(--text-3); text-align: center;
+    }
+
+    /* Format chooser */
+    .format-question {
+      font-size: 14px; color: var(--text-2);
+      margin-bottom: 14px;
+    }
+
+    .format-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 1.25rem;
+    }
+
+    .format-pill {
+      padding: 14px 16px;
+      background: rgba(0,0,0,0.32);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-2);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 12px;
+      text-align: left;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      font: inherit;
+    }
+    .format-pill:hover { border-color: var(--border-strong); color: var(--text); }
+    .format-pill .pill-emoji {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .format-pill .pill-text {
+      display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    }
+    .format-pill .pill-title {
+      color: var(--text); font-size: 14px; font-weight: 700;
+    }
+    .format-pill .pill-desc {
+      color: var(--text-3); font-size: 12px; font-weight: 500;
+    }
+    .format-pill.selected {
+      border-color: var(--purple);
+      background: rgba(167,139,250,0.10);
+      box-shadow: 0 0 0 1px var(--purple), 0 6px 24px rgba(167,139,250,0.18);
+      color: var(--text);
+    }
+    .format-pill.selected .pill-emoji {
+      background: var(--primary-gradient);
+      color: #0b0d18;
+    }
+
+    .reveal {
+      animation: fadeUp 0.35s ease-out;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 640px) {
+      .card { padding: 1.25rem; }
+      .card-title { font-size: 16px; }
+      .drop-zone { flex-direction: column; align-items: stretch; text-align: center; }
+      .file-status { justify-content: center; flex-wrap: wrap; }
+      .btn { width: 100%; justify-content: center; }
+      .format-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
 
-    <header>
-      <h1>Menu JSON Analyzer</h1>
-      <p>Paste your menu JSON and get an instant AI-powered audit — item counts, image coverage, upsells, misplaced items, and navigation recommendations.</p>
-    </header>
+  <header class="hero">
+    <div class="brand-mark">M</div>
+    <div class="brand-name">Menu Analyzer</div>
+    <span class="brand-pill">Flipdish · beta</span>
+  </header>
 
-    <div class="card">
-      <div class="card-title">Menu JSON</div>
-      <label for="json-input">Paste your JSON below</label>
-      <textarea id="json-input" placeholder='{"categories": [...], "items": [...]}'></textarea>
-      <div class="error" id="error-msg"></div>
-      <button class="btn" id="analyze-btn" onclick="runAnalysis()">
-        Analyze menu
-      </button>
+  <main class="page">
+
+    <!-- Step 1 -->
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">
+          <span class="emoji">📁</span>
+          Step 1: Load Export
+        </div>
+      </div>
+
+      <div class="drop-zone" id="drop-zone">
+        <button type="button" class="choose-btn" onclick="document.getElementById('file-input').click()">Choose File</button>
+        <input type="file" id="file-input" accept=".json,application/json" style="display:none" />
+        <div class="file-status" id="file-status">
+          <span class="filename" id="file-name">No file chosen</span>
+          <span class="filesize" id="file-size"></span>
+        </div>
+        <button type="button" class="file-clear" id="file-clear" onclick="clearFile()" style="display:none">Remove</button>
+      </div>
+
+      <div class="status-line" id="status-line"><span class="dot"></span> Ready for Menu Upload.</div>
+    </section>
+
+    <!-- Initial hint shown before a file is loaded -->
+    <div class="hint" id="empty-hint">
+      <div class="hint-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </div>
+      <div>
+        Upload your Flipdish menu export above. After upload, you'll be asked how you want the audit summary — on-screen or as a downloadable PDF.
+      </div>
     </div>
 
+    <!-- Step 2 — revealed after successful upload -->
+    <section class="card" id="step2" style="display:none">
+      <div class="card-head">
+        <div class="card-title">
+          <span class="emoji">⚡</span>
+          Step 2: Menu Optimizer
+        </div>
+      </div>
+
+      <div class="format-question">How would you like your audit summary?</div>
+      <div class="format-row" id="format-row">
+        <button type="button" class="format-pill selected" data-format="screen" onclick="selectFormat('screen')">
+          <div class="pill-emoji">📺</div>
+          <div class="pill-text">
+            <span class="pill-title">View on screen</span>
+            <span class="pill-desc">Read in the browser, streamed live</span>
+          </div>
+        </button>
+        <button type="button" class="format-pill" data-format="pdf" onclick="selectFormat('pdf')">
+          <div class="pill-emoji">📄</div>
+          <div class="pill-text">
+            <span class="pill-title">Download as PDF</span>
+            <span class="pill-desc">Auto-downloads when ready</span>
+          </div>
+        </button>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          Full Optimize
+        </button>
+      </div>
+    </section>
+
+    <!-- Results -->
     <div id="results">
-      <div class="card">
-        <div class="card-title">Summary</div>
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <span class="emoji">📊</span>
+            Audit Summary
+          </div>
+          <button class="btn btn-outline-pink" id="download-btn" onclick="downloadPDF()" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+            Download PDF
+          </button>
+        </div>
         <div class="metrics-grid" id="metrics-grid"></div>
-      </div>
+      </section>
 
-      <div class="card">
-        <div class="card-title">Full analysis</div>
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">
+            <span class="emoji">📝</span>
+            Full Analysis
+          </div>
+        </div>
         <div class="analysis-output cursor" id="analysis-text"></div>
-      </div>
+      </section>
     </div>
 
-    <footer>Powered by Claude (Anthropic) &mdash; Flipdish menu team beta</footer>
-
-  </div>
+    <footer>Powered by Claude (Anthropic) · Flipdish menu team</footer>
+  </main>
 
   <script>
-    async function runAnalysis() {
-      const raw = document.getElementById('json-input').value.trim();
-      const errEl = document.getElementById('error-msg');
+    let currentMenu = null;
+    let currentFileName = null;
+    let lastAnalysisText = '';
+    let lastMetrics = null;
+    let outputFormat = 'screen'; // 'screen' or 'pdf'
+
+    function selectFormat(fmt) {
+      outputFormat = fmt;
+      document.querySelectorAll('.format-pill').forEach(el => {
+        el.classList.toggle('selected', el.dataset.format === fmt);
+      });
       const btn = document.getElementById('analyze-btn');
+      btn.lastChild.textContent = fmt === 'pdf' ? ' Optimize & Download PDF' : ' Full Optimize';
+    }
 
-      errEl.style.display = 'none';
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
+    const statusLine = document.getElementById('status-line');
 
-      if (!raw) {
-        showError('Please paste your menu JSON first.');
+    fileInput.addEventListener('change', e => {
+      if (e.target.files[0]) loadFile(e.target.files[0]);
+    });
+
+    ['dragenter','dragover'].forEach(ev =>
+      dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragging'); }));
+    ['dragleave','drop'].forEach(ev =>
+      dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragging'); }));
+    dropZone.addEventListener('drop', e => {
+      const file = e.dataTransfer.files[0];
+      if (file) loadFile(file);
+    });
+
+    function loadFile(file) {
+      if (!(file.type === 'application/json' || file.name.toLowerCase().endsWith('.json'))) {
+        setStatus('error', 'Please choose a .json file.');
         return;
       }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          currentMenu = JSON.parse(ev.target.result);
+          currentFileName = file.name;
+          document.getElementById('file-name').textContent = file.name;
+          document.getElementById('file-size').textContent = formatBytes(file.size);
+          document.getElementById('file-clear').style.display = 'block';
+          dropZone.classList.add('has-file');
+          setStatus('ok', 'Menu loaded · ready to optimize.');
+          const step2 = document.getElementById('step2');
+          step2.style.display = '';
+          step2.classList.remove('reveal'); void step2.offsetWidth; step2.classList.add('reveal');
+          document.getElementById('empty-hint').style.display = 'none';
+          step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (err) {
+          setStatus('error', 'Invalid JSON: ' + err.message);
+          currentMenu = null;
+        }
+      };
+      reader.readAsText(file);
+    }
 
-      let parsed;
-      try { parsed = JSON.parse(raw); } catch (e) {
-        showError('Invalid JSON — please check your input and try again. ' + e.message);
-        return;
-      }
-
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+    function clearFile() {
+      currentMenu = null;
+      currentFileName = null;
+      fileInput.value = '';
+      document.getElementById('file-name').textContent = 'No file chosen';
+      document.getElementById('file-size').textContent = '';
+      document.getElementById('file-clear').style.display = 'none';
+      dropZone.classList.remove('has-file');
+      setStatus('muted', 'Ready for Menu Upload.');
+      document.getElementById('step2').style.display = 'none';
       document.getElementById('results').style.display = 'none';
+      document.getElementById('empty-hint').style.display = '';
+    }
+
+    function setStatus(kind, text) {
+      statusLine.className = 'status-line ' + (kind === 'ok' ? '' : kind);
+      statusLine.innerHTML = '<span class="dot"></span> ' + text;
+    }
+
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+      return (b/1024/1024).toFixed(2) + ' MB';
+    }
+
+    async function runAnalysis() {
+      if (!currentMenu) {
+        setStatus('error', 'Please choose a menu JSON file first.');
+        return;
+      }
+
+      const btn = document.getElementById('analyze-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Optimizing…';
+      document.getElementById('empty-hint').style.display = 'none';
+      document.getElementById('results').style.display = 'block';
       document.getElementById('analysis-text').textContent = '';
-      document.getElementById('metrics-grid').innerHTML = '';
+      document.getElementById('metrics-grid').innerHTML = renderSkeletons();
+      document.getElementById('download-btn').style.display = 'none';
+      lastAnalysisText = '';
+      lastMetrics = null;
 
       try {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ menu: parsed }),
+          body: JSON.stringify({ menu: currentMenu }),
         });
 
         if (!response.ok) {
           const err = await response.json().catch(() => ({}));
-          showError('Server error ' + response.status + ': ' + (err?.error || response.statusText));
-          btn.disabled = false;
-          btn.innerHTML = 'Analyze menu';
+          setStatus('error', 'Server error ' + response.status + ': ' + (err?.error || response.statusText));
+          resetBtn();
           return;
         }
 
         const analysisEl = document.getElementById('analysis-text');
-        document.getElementById('results').style.display = 'block';
+        analysisEl.classList.add('cursor');
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -297,42 +680,132 @@
                 if (!metricsExtracted && fullText.includes('JSON>>>')) {
                   const match = fullText.match(/<<<JSON\s*([\s\S]*?)\s*JSON>>>/);
                   if (match) {
-                    try { renderMetrics(JSON.parse(match[1])); metricsExtracted = true; } catch (e) {}
+                    try {
+                      lastMetrics = JSON.parse(match[1]);
+                      renderMetrics(lastMetrics);
+                      metricsExtracted = true;
+                    } catch (e) {}
                   }
                 }
-                analysisEl.textContent = fullText.replace(/<<<JSON[\s\S]*?JSON>>>\n?/, '').trim();
+                lastAnalysisText = fullText.replace(/<<<JSON[\s\S]*?JSON>>>\n?/, '').trim();
+                analysisEl.textContent = lastAnalysisText;
               }
             } catch (e) {}
           }
         }
-
         analysisEl.classList.remove('cursor');
-
+        document.getElementById('download-btn').style.display = 'inline-flex';
+        if (outputFormat === 'pdf') {
+          setStatus('ok', 'Optimization complete · downloading PDF…');
+          setTimeout(downloadPDF, 250);
+        } else {
+          setStatus('ok', 'Optimization complete.');
+        }
       } catch (e) {
-        showError('Network error: ' + e.message);
+        setStatus('error', 'Network error: ' + e.message);
       }
 
-      btn.disabled = false;
-      btn.innerHTML = 'Analyze menu';
+      resetBtn();
     }
 
-    function renderMetrics(m) {
-      const items = [
-        { label: 'Items', value: m.items ?? '—' },
-        { label: 'Categories', value: m.categories ?? '—' },
-        { label: 'Item images', value: m.item_images ?? '—' },
-        { label: 'Category images', value: m.category_images ?? '—' },
-        { label: 'Upsells', value: m.upsells ?? '—' }
-      ];
-      document.getElementById('metrics-grid').innerHTML = items.map(i =>
-        `<div class="metric"><div class="metric-label">${i.label}</div><div class="metric-value">${i.value}</div></div>`
+    function resetBtn() {
+      const btn = document.getElementById('analyze-btn');
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg> Full Optimize';
+    }
+
+    function renderSkeletons() {
+      return Array(5).fill(0).map(() =>
+        '<div class="metric"><div class="skeleton" style="width:60%; margin-bottom:14px;"></div><div class="skeleton" style="height:24px; width:40%;"></div></div>'
       ).join('');
     }
 
-    function showError(msg) {
-      const el = document.getElementById('error-msg');
-      el.textContent = msg;
-      el.style.display = 'block';
+    const ICONS = {
+      items: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+      categories: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/></svg>',
+      images: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
+      upsells: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m23 6-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>'
+    };
+
+    function renderMetrics(m) {
+      const items = [
+        { label: 'Items',           value: m.items ?? '—',           cls: 'm-cyan',   icon: ICONS.items },
+        { label: 'Categories',      value: m.categories ?? '—',      cls: 'm-purple', icon: ICONS.categories },
+        { label: 'Item images',     value: m.item_images ?? '—',     cls: 'm-mint',   icon: ICONS.images },
+        { label: 'Category images', value: m.category_images ?? '—', cls: 'm-amber',  icon: ICONS.images },
+        { label: 'Upsells',         value: m.upsells ?? '—',         cls: 'm-pink',   icon: ICONS.upsells }
+      ];
+      document.getElementById('metrics-grid').innerHTML = items.map(i =>
+        '<div class="metric ' + i.cls + '"><div class="icon-bubble">' + i.icon + '</div><div class="metric-label">' + i.label + '</div><div class="metric-value">' + i.value + '</div></div>'
+      ).join('');
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 48;
+      let y = margin;
+
+      // Header bar
+      doc.setFillColor(124, 58, 237); // purple
+      doc.rect(0, 0, pageW, 6, 'F');
+      y += 8;
+
+      doc.setFont('helvetica', 'bold').setFontSize(22).setTextColor(20);
+      doc.text('Menu Audit Report', margin, y); y += 8;
+
+      doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(120);
+      const meta = (currentFileName ? currentFileName + ' · ' : '') +
+                   new Date().toLocaleString() + ' · Flipdish Menu Team';
+      y += 14; doc.text(meta, margin, y); y += 22;
+
+      doc.setDrawColor(220).setLineWidth(0.5).line(margin, y, pageW - margin, y); y += 22;
+
+      // Summary
+      if (lastMetrics) {
+        doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(20);
+        doc.text('Summary', margin, y); y += 18;
+
+        const rows = [
+          ['Items',           lastMetrics.items],
+          ['Categories',      lastMetrics.categories],
+          ['Item images',     lastMetrics.item_images],
+          ['Category images', lastMetrics.category_images],
+          ['Upsells',         lastMetrics.upsells],
+        ];
+        doc.setFontSize(11);
+        for (const [label, val] of rows) {
+          doc.setFont('helvetica', 'normal').setTextColor(110).text(label, margin, y);
+          doc.setFont('helvetica', 'bold').setTextColor(20).text(String(val ?? '—'), margin + 200, y);
+          y += 17;
+        }
+        y += 14;
+      }
+
+      // Analysis
+      doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(20);
+      doc.text('Full analysis', margin, y); y += 18;
+
+      doc.setFont('helvetica', 'normal').setFontSize(10.5).setTextColor(40);
+      const lines = doc.splitTextToSize(lastAnalysisText || '(no analysis text)', pageW - margin * 2);
+      for (const line of lines) {
+        if (y > pageH - margin) { doc.addPage(); y = margin; }
+        doc.text(line, margin, y); y += 14;
+      }
+
+      // Footer on each page
+      const pages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9).setTextColor(160);
+        doc.text('Generated by Menu Analyzer · Flipdish', margin, pageH - 24);
+        doc.text(i + ' / ' + pages, pageW - margin, pageH - 24, { align: 'right' });
+      }
+
+      const stamp = new Date().toISOString().slice(0,10);
+      doc.save('menu-audit-' + stamp + '.pdf');
     }
   </script>
 </body>
