@@ -482,7 +482,10 @@
        Hidden light-themed report template — rendered to PDF only
        ============================================================ */
     #report-template {
-      position: fixed; left: -99999px; top: 0; pointer-events: none;
+      position: absolute; left: 0; top: 0;
+      z-index: -1; opacity: 0;
+      pointer-events: none;
+      width: 794px;
     }
     .report {
       width: 794px; /* ≈ A4 width @ 96dpi */
@@ -1012,10 +1015,12 @@
     }
 
     // ----- PDF generation via html2pdf -----
-    function downloadPDF() {
+    async function downloadPDF() {
       const reportBody = document.getElementById('report-body');
       const reportMeta = document.getElementById('report-meta');
       const reportTitle = document.getElementById('report-title');
+      const tpl = document.getElementById('report-template');
+      const reportEl = document.getElementById('report');
 
       const restaurantName = guessRestaurantName(currentMenu) ||
         (currentFileName || '').replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() ||
@@ -1030,20 +1035,49 @@
       if (supportingReports.length) lines.push('Includes ' + supportingReports.length + ' supporting business report(s)');
       reportMeta.innerHTML = lines.map(escapeHtml).join('<br/>');
 
-      reportBody.innerHTML = lastAnalysisHtml || '<p>(no analysis content)</p>';
+      const html = lastAnalysisHtml ||
+        (window.marked ? marked.parse(lastAnalysisText || '') : escapeHtml(lastAnalysisText || ''));
+      reportBody.innerHTML = html || '<p>(no analysis content — try running the optimization again)</p>';
 
       const stamp = new Date().toISOString().slice(0,10);
       const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
       const filename = safeName + '_Menu_Audit_' + stamp + '.pdf';
 
-      html2pdf().set({
-        margin: [10, 0, 14, 0],
-        filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      }).from(document.getElementById('report')).save();
+      // Bring template fully on-screen for html2canvas to capture reliably,
+      // but keep it transparent so the user doesn't see a flash.
+      const prevOpacity = tpl.style.opacity;
+      const prevZIndex = tpl.style.zIndex;
+      tpl.style.opacity = '0';
+      tpl.style.zIndex = '9999';
+
+      try {
+        if (document.fonts && document.fonts.ready) {
+          try { await document.fonts.ready; } catch (_) {}
+        }
+        // Yield a frame so layout settles after we just set innerHTML
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        await html2pdf().set({
+          margin: [10, 0, 14, 0],
+          filename,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            windowWidth: 794
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] }
+        }).from(reportEl).save();
+      } catch (e) {
+        console.error('PDF generation failed:', e);
+        setStatus('error', 'PDF generation failed: ' + (e?.message || e));
+      } finally {
+        tpl.style.opacity = prevOpacity;
+        tpl.style.zIndex = prevZIndex;
+      }
     }
 
     function guessRestaurantName(menu) {
