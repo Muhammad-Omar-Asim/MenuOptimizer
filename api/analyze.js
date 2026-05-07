@@ -81,7 +81,6 @@ ${JSON.stringify(menu, null, 2)}`;
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
     },
   });
 }
