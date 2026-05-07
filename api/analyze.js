@@ -8,7 +8,7 @@ export default async function handler(req) {
     });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: 'Server is missing ANTHROPIC_API_KEY env var' }),
