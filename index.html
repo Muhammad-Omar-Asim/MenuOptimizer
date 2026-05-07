@@ -13,11 +13,54 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
+    // Apply saved theme synchronously to avoid flash of unstyled theme
+    (function () {
+      try {
+        var t = localStorage.getItem('menu-analyzer-theme');
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (_) {}
+    })();
   </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
+      --bg: #f7f8fb;
+      --bg-2: #eef0f6;
+      --surface: #ffffff;
+      --surface-solid: #ffffff;
+      --pill: #f1f3f8;
+      --pill-hover: #e6e9f1;
+      --border: rgba(15,23,42,0.10);
+      --border-strong: rgba(15,23,42,0.18);
+      --text: #0f172a;
+      --text-2: #475569;
+      --text-3: #94a3b8;
+      --cyan: #0891b2;
+      --purple: #7c3aed;
+      --pink: #db2777;
+      --mint: #059669;
+      --rose: #e11d48;
+      --amber: #d97706;
+      --primary-gradient: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 50%, #f9a8d4 100%);
+      --panel-gradient: linear-gradient(135deg, rgba(125,211,252,0.16) 0%, rgba(167,139,250,0.20) 45%, rgba(249,168,212,0.10) 75%, rgba(255,255,255,0) 100%);
+      --sub-bg: rgba(15,23,42,0.03);
+      --hint-bg: rgba(125,211,252,0.06);
+      --hint-icon-bg: rgba(125,211,252,0.15);
+      --hint-icon-border: rgba(125,211,252,0.45);
+      --code-bg: rgba(124,58,237,0.10);
+      --code-color: var(--purple);
+      --table-bg: #ffffff;
+      --table-zebra-bg: rgba(125,211,252,0.04);
+      --shimmer-1: rgba(15,23,42,0.05);
+      --shimmer-2: rgba(15,23,42,0.10);
+      --chip-x-bg: rgba(15,23,42,0.06);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --radius-pill: 999px;
+    }
+
+    :root[data-theme="dark"] {
       --bg: #07090f;
       --bg-2: #0c0f1a;
       --surface: #11152099;
@@ -35,18 +78,26 @@
       --mint: #34d399;
       --rose: #fb7185;
       --amber: #fbbf24;
-      --primary-gradient: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 50%, #f9a8d4 100%);
-      --panel-gradient: linear-gradient(135deg, rgba(45,212,191,0.18) 0%, rgba(167,139,250,0.22) 45%, rgba(249,168,212,0.10) 75%, rgba(15,19,32,0.0) 100%);
-      --radius: 18px;
-      --radius-sm: 12px;
-      --radius-pill: 999px;
+      --panel-gradient: linear-gradient(135deg, rgba(45,212,191,0.18) 0%, rgba(167,139,250,0.22) 45%, rgba(249,168,212,0.10) 75%, rgba(15,19,32,0) 100%);
+      --sub-bg: rgba(0,0,0,0.32);
+      --hint-bg: rgba(255,255,255,0.02);
+      --hint-icon-bg: rgba(125,211,252,0.10);
+      --hint-icon-border: rgba(125,211,252,0.30);
+      --code-bg: rgba(255,255,255,0.06);
+      --code-color: var(--cyan);
+      --table-bg: rgba(255,255,255,0.02);
+      --table-zebra-bg: transparent;
+      --shimmer-1: rgba(255,255,255,0.04);
+      --shimmer-2: rgba(255,255,255,0.10);
+      --chip-x-bg: rgba(255,255,255,0.06);
     }
 
     body {
       font-family: 'DM Sans', sans-serif;
       background:
-        radial-gradient(1100px 600px at 85% -10%, rgba(167,139,250,0.18), transparent 60%),
-        radial-gradient(900px 500px at 5% 0%, rgba(45,212,191,0.12), transparent 60%),
+        radial-gradient(1100px 600px at 88% -8%, rgba(167,139,250,0.22), transparent 60%),
+        radial-gradient(900px 500px at 5% 0%, rgba(125,211,252,0.20), transparent 60%),
+        radial-gradient(700px 500px at 50% 110%, rgba(249,168,212,0.14), transparent 70%),
         var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -124,7 +175,7 @@
 
     /* Drop zone */
     .drop-zone {
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1.5px dashed var(--border-strong);
       border-radius: var(--radius-sm);
       padding: 22px;
@@ -201,7 +252,7 @@
     }
     .text-input {
       width: 100%;
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: var(--radius-sm);
@@ -220,7 +271,7 @@
     .field-block:last-of-type { margin-bottom: 1.25rem; }
 
     .reports-zone {
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1.5px dashed var(--border-strong);
       border-radius: var(--radius-sm);
       padding: 16px;
@@ -250,7 +301,7 @@
     .report-chip .size { color: var(--text-3); font-size: 11.5px; }
     .report-chip .x {
       width: 22px; height: 22px;
-      border-radius: 50%; background: rgba(255,255,255,0.06);
+      border-radius: 50%; background: var(--chip-x-bg);
       display: grid; place-items: center;
       cursor: pointer; color: var(--text-3);
       transition: background 0.15s, color 0.15s;
@@ -268,7 +319,7 @@
     }
     .format-pill {
       padding: 14px 16px;
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
       color: var(--text-2);
@@ -333,15 +384,15 @@
       padding: 14px 16px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      background: rgba(255,255,255,0.02);
+      background: var(--hint-bg);
       display: flex; gap: 12px; align-items: flex-start;
       font-size: 13px; color: var(--text-2); line-height: 1.55;
     }
     .hint-icon {
       flex-shrink: 0;
       width: 28px; height: 28px;
-      background: rgba(125,211,252,0.10);
-      border: 1px solid rgba(125,211,252,0.30);
+      background: var(--hint-icon-bg);
+      border: 1px solid var(--hint-icon-border);
       border-radius: 8px;
       display: grid; place-items: center;
       color: var(--cyan);
@@ -355,7 +406,7 @@
     }
     .metric {
       padding: 18px 20px;
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       transition: transform 0.15s, border-color 0.2s;
@@ -375,15 +426,41 @@
       font-size: 28px; font-weight: 700; color: var(--text);
       letter-spacing: -0.025em;
     }
-    .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.12); color: var(--cyan); }
-    .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.14); color: var(--purple); }
-    .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.12);  color: var(--mint); }
-    .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.12);  color: var(--amber); }
-    .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.14); color: var(--pink); }
+    .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.22); color: var(--cyan); }
+    .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.22); color: var(--purple); }
+    .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.20);  color: var(--mint); }
+    .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.22);  color: var(--amber); }
+    .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.30); color: var(--pink); }
+
+    [data-theme="dark"] .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.12); }
+    [data-theme="dark"] .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.14); }
+    [data-theme="dark"] .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.12); }
+    [data-theme="dark"] .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.12); }
+    [data-theme="dark"] .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.14); }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--pill);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: background 0.2s, color 0.2s, transform 0.1s;
+      margin-left: 6px;
+    }
+    .theme-toggle:hover { background: var(--pill-hover); color: var(--text); }
+    .theme-toggle:active { transform: scale(0.95); }
+    .theme-toggle svg { width: 16px; height: 16px; display: block; }
+    .theme-toggle .icon-sun { display: none; }
+    .theme-toggle .icon-moon { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+    [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
     /* Markdown analysis output (dark) */
     .analysis-output {
-      background: rgba(0,0,0,0.32);
+      background: var(--sub-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       padding: 1.5rem 1.75rem;
@@ -411,25 +488,27 @@
     .analysis-output strong { color: var(--text); font-weight: 700; }
     .analysis-output em { color: var(--text-2); }
     .analysis-output code {
-      background: rgba(255,255,255,0.06);
+      background: var(--code-bg);
       padding: 1px 6px; border-radius: 4px;
       font: 12.5px 'DM Mono', monospace;
-      color: var(--cyan);
+      color: var(--code-color);
     }
     .analysis-output table {
       width: 100%; border-collapse: collapse;
       margin: 0.85rem 0 1.25rem;
       font-size: 13px;
-      background: rgba(255,255,255,0.02);
+      background: var(--table-bg);
       border-radius: 8px;
       overflow: hidden;
+      border: 1px solid var(--border);
     }
     .analysis-output th {
       background: rgba(167,139,250,0.18);
       color: var(--text); text-align: left;
-      padding: 9px 12px; font-weight: 600;
+      padding: 9px 12px; font-weight: 700;
       border-bottom: 1px solid var(--border-strong);
     }
+    .analysis-output tr:nth-child(even) td { background: var(--table-zebra-bg); }
     .analysis-output td {
       padding: 8px 12px;
       border-bottom: 1px solid var(--border);
@@ -448,7 +527,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .skeleton {
-      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 75%);
+      background: linear-gradient(90deg, var(--shimmer-1) 25%, var(--shimmer-2) 50%, var(--shimmer-1) 75%);
       background-size: 200% 100%;
       animation: shimmer 1.5s infinite;
       border-radius: 6px; height: 14px;
@@ -579,6 +658,10 @@
     <div class="brand-mark">M</div>
     <div class="brand-name">Menu Analyzer</div>
     <span class="brand-pill">Flipdish · beta</span>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle dark/light theme" onclick="toggleTheme()">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
   </header>
 
   <main class="page">
@@ -724,6 +807,14 @@
 
     if (window.marked) {
       marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
+    }
+
+    function toggleTheme() {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      else document.documentElement.removeAttribute('data-theme');
+      try { localStorage.setItem('menu-analyzer-theme', next); } catch (_) {}
     }
 
     // ----- Step 1: menu JSON file -----
