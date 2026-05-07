@@ -4,8 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu Analyzer · Flipdish</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -46,40 +54,11 @@
       padding-bottom: 4rem;
     }
 
-    /* Top nav */
-    .topbar {
-      max-width: 1080px; margin: 0 auto;
-      padding: 1.25rem 1.5rem;
-      display: flex; align-items: center; justify-content: center;
-      flex-wrap: wrap; gap: 8px;
-    }
-
-    .nav-pill {
-      padding: 9px 18px;
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      color: var(--text);
-      font: 600 13.5px 'DM Sans', sans-serif;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
-    }
-    .nav-pill:hover { background: var(--pill); border-color: var(--border-strong); }
-
-    .nav-pill.active {
-      background: var(--primary-gradient);
-      color: #0b0d18;
-      border-color: transparent;
-      box-shadow: 0 4px 24px rgba(167,139,250,0.35), 0 1px 0 rgba(255,255,255,0.4) inset;
-    }
-
-    /* Hero */
     .hero {
       max-width: 1080px; margin: 0 auto;
-      padding: 1.5rem 1.5rem 1rem;
+      padding: 1.75rem 1.5rem 1rem;
       display: flex; align-items: center; gap: 12px;
     }
-
     .brand-mark {
       width: 36px; height: 36px;
       border-radius: 10px;
@@ -88,11 +67,9 @@
       color: #0b0d18; font-weight: 800; font-size: 16px;
       box-shadow: 0 6px 24px rgba(125,211,252,0.30);
     }
-
     .brand-name {
       font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
     }
-
     .brand-pill {
       margin-left: auto;
       font-size: 11px; padding: 5px 12px;
@@ -103,13 +80,11 @@
       font-weight: 600;
     }
 
-    /* Page */
     .page {
       max-width: 1080px; margin: 0 auto;
       padding: 0 1.5rem;
     }
 
-    /* Card with iridescent gradient — uses pseudo for the gradient overlay */
     .card {
       position: relative;
       background: var(--surface-solid);
@@ -121,17 +96,13 @@
       isolation: isolate;
     }
     .card::before {
-      content: '';
-      position: absolute; inset: 0;
+      content: ''; position: absolute; inset: 0;
       background: var(--panel-gradient);
-      pointer-events: none;
-      z-index: -1;
+      pointer-events: none; z-index: -1;
     }
     .card::after {
-      content: '';
-      position: absolute; inset: 0;
-      border-radius: inherit;
-      padding: 1px;
+      content: ''; position: absolute; inset: 0;
+      border-radius: inherit; padding: 1px;
       background: linear-gradient(135deg, rgba(125,211,252,0.30), rgba(167,139,250,0.30) 50%, rgba(249,168,212,0.10) 100%);
       -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
               mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -144,21 +115,11 @@
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 1.1rem; gap: 12px;
     }
-
     .card-title {
       font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
       display: flex; align-items: center; gap: 10px;
     }
-    .card-title .step {
-      font-size: 11px; padding: 3px 9px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      color: var(--text-2);
-      border-radius: var(--radius-pill); font-weight: 600;
-      letter-spacing: 0.04em; text-transform: uppercase;
-    }
     .card-title .emoji { font-size: 20px; }
-
     .card-actions { display: flex; gap: 8px; }
 
     /* Drop zone */
@@ -223,6 +184,123 @@
     .status-line.error { color: var(--rose); }
     .status-line .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
+    /* Inputs */
+    .field-label {
+      display: block;
+      font-size: 12.5px; font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .field-help {
+      font-size: 12.5px;
+      color: var(--text-3);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .text-input {
+      width: 100%;
+      background: rgba(0,0,0,0.32);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font: 14px 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .text-input::placeholder { color: var(--text-3); }
+    .text-input:focus {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 3px rgba(167,139,250,0.18);
+    }
+
+    .field-block { margin-bottom: 1.25rem; }
+    .field-block:last-of-type { margin-bottom: 1.25rem; }
+
+    .reports-zone {
+      background: rgba(0,0,0,0.32);
+      border: 1.5px dashed var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      display: flex; align-items: center; gap: 14px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .reports-zone.dragging {
+      border-color: var(--cyan); background: rgba(125,211,252,0.10);
+    }
+    .reports-hint { font-size: 13px; color: var(--text-3); }
+
+    .reports-list {
+      margin-top: 10px;
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .report-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(167,139,250,0.10);
+      border: 1px solid rgba(167,139,250,0.28);
+      color: var(--text);
+      border-radius: var(--radius-pill);
+      padding: 6px 6px 6px 12px;
+      font-size: 12.5px; font-weight: 500;
+      max-width: 100%;
+    }
+    .report-chip .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .report-chip .size { color: var(--text-3); font-size: 11.5px; }
+    .report-chip .x {
+      width: 22px; height: 22px;
+      border-radius: 50%; background: rgba(255,255,255,0.06);
+      display: grid; place-items: center;
+      cursor: pointer; color: var(--text-3);
+      transition: background 0.15s, color 0.15s;
+    }
+    .report-chip .x:hover { background: rgba(251,113,133,0.20); color: var(--rose); }
+
+    /* Format chooser */
+    .format-question {
+      font-size: 14px; color: var(--text-2);
+      margin-bottom: 14px;
+    }
+    .format-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 1.25rem;
+    }
+    .format-pill {
+      padding: 14px 16px;
+      background: rgba(0,0,0,0.32);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-2);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 12px;
+      text-align: left;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+      font: inherit;
+    }
+    .format-pill:hover { border-color: var(--border-strong); color: var(--text); }
+    .format-pill .pill-emoji {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 18px; flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .format-pill .pill-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .format-pill .pill-title { color: var(--text); font-size: 14px; font-weight: 700; }
+    .format-pill .pill-desc { color: var(--text-3); font-size: 12px; font-weight: 500; }
+    .format-pill.selected {
+      border-color: var(--purple);
+      background: rgba(167,139,250,0.10);
+      box-shadow: 0 0 0 1px var(--purple), 0 6px 24px rgba(167,139,250,0.18);
+      color: var(--text);
+    }
+    .format-pill.selected .pill-emoji {
+      background: var(--primary-gradient);
+      color: #0b0d18;
+    }
+
     /* Buttons */
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -238,27 +316,20 @@
     .btn:hover { background: var(--pill-hover); }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-
     .btn-primary {
       background: var(--primary-gradient);
-      color: #0b0d18;
-      border: none;
+      color: #0b0d18; border: none;
       box-shadow: 0 6px 28px rgba(167,139,250,0.35);
     }
     .btn-primary:hover { box-shadow: 0 8px 36px rgba(167,139,250,0.5); }
-
     .btn-outline-pink {
       border-color: rgba(249,168,212,0.45);
       color: var(--pink);
     }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
 
-    .btn-row {
-      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem;
-    }
-
-    /* Empty hint */
     .hint {
-      margin-top: 1.25rem;
+      margin-bottom: 1.25rem;
       padding: 14px 16px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
@@ -276,15 +347,12 @@
       color: var(--cyan);
     }
 
-    /* Results */
     #results { display: none; }
-
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
     }
-
     .metric {
       padding: 18px 20px;
       background: rgba(0,0,0,0.32);
@@ -307,24 +375,68 @@
       font-size: 28px; font-weight: 700; color: var(--text);
       letter-spacing: -0.025em;
     }
-
     .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.12); color: var(--cyan); }
     .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.14); color: var(--purple); }
     .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.12);  color: var(--mint); }
     .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.12);  color: var(--amber); }
     .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.14); color: var(--pink); }
 
+    /* Markdown analysis output (dark) */
     .analysis-output {
       background: rgba(0,0,0,0.32);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      padding: 1.25rem 1.5rem;
-      font-size: 14.5px;
-      line-height: 1.8;
+      padding: 1.5rem 1.75rem;
+      font-size: 14px;
+      line-height: 1.7;
       color: var(--text-2);
-      white-space: pre-wrap; word-break: break-word;
       min-height: 80px;
+      overflow-x: auto;
     }
+    .analysis-output h2 {
+      font-size: 19px; color: var(--text); font-weight: 700;
+      margin: 1.6rem 0 0.85rem;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-strong);
+      letter-spacing: -0.01em;
+    }
+    .analysis-output h2:first-child { margin-top: 0; }
+    .analysis-output h3 {
+      font-size: 15.5px; color: var(--cyan); font-weight: 600;
+      margin: 1.3rem 0 0.55rem;
+    }
+    .analysis-output p { margin-bottom: 0.85rem; }
+    .analysis-output ul, .analysis-output ol { padding-left: 22px; margin-bottom: 0.85rem; }
+    .analysis-output li { margin-bottom: 0.3rem; }
+    .analysis-output strong { color: var(--text); font-weight: 700; }
+    .analysis-output em { color: var(--text-2); }
+    .analysis-output code {
+      background: rgba(255,255,255,0.06);
+      padding: 1px 6px; border-radius: 4px;
+      font: 12.5px 'DM Mono', monospace;
+      color: var(--cyan);
+    }
+    .analysis-output table {
+      width: 100%; border-collapse: collapse;
+      margin: 0.85rem 0 1.25rem;
+      font-size: 13px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .analysis-output th {
+      background: rgba(167,139,250,0.18);
+      color: var(--text); text-align: left;
+      padding: 9px 12px; font-weight: 600;
+      border-bottom: 1px solid var(--border-strong);
+    }
+    .analysis-output td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+      vertical-align: top;
+    }
+    .analysis-output tr:last-child td { border-bottom: none; }
 
     .spinner {
       width: 14px; height: 14px;
@@ -346,90 +458,115 @@
       100% { background-position: -200% 0; }
     }
 
-    .cursor::after {
-      content: '▋';
-      animation: blink 1s step-end infinite;
-      font-size: 12px;
-      color: var(--cyan);
-      margin-left: 2px;
+    .reveal { animation: fadeUp 0.35s ease-out; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes blink { 50% { opacity: 0; } }
 
     footer {
       margin-top: 2rem;
       font-size: 12px; color: var(--text-3); text-align: center;
     }
 
-    /* Format chooser */
-    .format-question {
-      font-size: 14px; color: var(--text-2);
-      margin-bottom: 14px;
-    }
-
-    .format-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 1.25rem;
-    }
-
-    .format-pill {
-      padding: 14px 16px;
-      background: rgba(0,0,0,0.32);
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text-2);
-      cursor: pointer;
-      display: flex; align-items: center; gap: 12px;
-      text-align: left;
-      transition: border-color 0.2s, background 0.2s, transform 0.1s;
-      font: inherit;
-    }
-    .format-pill:hover { border-color: var(--border-strong); color: var(--text); }
-    .format-pill .pill-emoji {
-      width: 36px; height: 36px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 9px;
-      display: grid; place-items: center;
-      font-size: 18px;
-      flex-shrink: 0;
-      transition: background 0.2s;
-    }
-    .format-pill .pill-text {
-      display: flex; flex-direction: column; gap: 2px; min-width: 0;
-    }
-    .format-pill .pill-title {
-      color: var(--text); font-size: 14px; font-weight: 700;
-    }
-    .format-pill .pill-desc {
-      color: var(--text-3); font-size: 12px; font-weight: 500;
-    }
-    .format-pill.selected {
-      border-color: var(--purple);
-      background: rgba(167,139,250,0.10);
-      box-shadow: 0 0 0 1px var(--purple), 0 6px 24px rgba(167,139,250,0.18);
-      color: var(--text);
-    }
-    .format-pill.selected .pill-emoji {
-      background: var(--primary-gradient);
-      color: #0b0d18;
-    }
-
-    .reveal {
-      animation: fadeUp 0.35s ease-out;
-    }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
     @media (max-width: 640px) {
       .card { padding: 1.25rem; }
       .card-title { font-size: 16px; }
-      .drop-zone { flex-direction: column; align-items: stretch; text-align: center; }
+      .drop-zone, .reports-zone { flex-direction: column; align-items: stretch; text-align: center; }
       .file-status { justify-content: center; flex-wrap: wrap; }
       .btn { width: 100%; justify-content: center; }
       .format-row { grid-template-columns: 1fr; }
+    }
+
+    /* ============================================================
+       Hidden light-themed report template — rendered to PDF only
+       ============================================================ */
+    #report-template {
+      position: fixed; left: -99999px; top: 0; pointer-events: none;
+    }
+    .report {
+      width: 794px; /* ≈ A4 width @ 96dpi */
+      padding: 56px 56px 48px;
+      background: #ffffff;
+      color: #1a1a1a;
+      font-family: 'DM Sans', -apple-system, system-ui, sans-serif;
+      font-size: 11.5pt;
+      line-height: 1.55;
+    }
+    .report .doc-header {
+      text-align: center;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 2px solid #d4af37;
+    }
+    .report .doc-title {
+      font-family: 'Playfair Display', 'DM Sans', serif;
+      font-size: 28pt; font-weight: 700;
+      color: #1d3557;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .report .doc-subtitle {
+      font-size: 14pt; color: #b03333;
+      font-style: italic;
+      margin-bottom: 6px;
+    }
+    .report .doc-meta {
+      font-size: 10.5pt; color: #555;
+      line-height: 1.5;
+    }
+    .report h2 {
+      font-size: 16pt; color: #1d3557; font-weight: 700;
+      margin: 22pt 0 10pt;
+      padding-bottom: 5pt;
+      border-bottom: 2px solid #d4af37;
+      page-break-after: avoid;
+    }
+    .report h2:first-of-type { margin-top: 8pt; }
+    .report h3 {
+      font-size: 12.5pt; color: #b03333; font-weight: 700;
+      margin: 14pt 0 7pt;
+      page-break-after: avoid;
+    }
+    .report p { margin-bottom: 8pt; }
+    .report ul, .report ol { padding-left: 18pt; margin-bottom: 9pt; }
+    .report li { margin-bottom: 3pt; }
+    .report strong { font-weight: 700; color: #1a1a1a; }
+    .report em { color: #555; font-style: italic; }
+    .report code {
+      font-family: 'DM Mono', monospace;
+      background: #f0ece0;
+      padding: 1pt 4pt;
+      border-radius: 3px;
+      font-size: 10pt;
+      color: #1d3557;
+    }
+    .report table {
+      width: 100%; border-collapse: collapse;
+      margin: 9pt 0 13pt;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    .report th {
+      background: #1d3557; color: #ffffff;
+      padding: 8pt 10pt; text-align: left;
+      font-weight: 600;
+      font-size: 10pt;
+    }
+    .report td {
+      border: 1px solid #e0d8c5;
+      padding: 7pt 10pt;
+      vertical-align: top;
+    }
+    .report tr:nth-child(even) td { background: #faf6ec; }
+    .report .end-rule {
+      text-align: center;
+      font-style: italic;
+      color: #888;
+      margin-top: 22pt;
+      padding-top: 14pt;
+      border-top: 1px solid #e0d8c5;
     }
   </style>
 </head>
@@ -448,7 +585,7 @@
       <div class="card-head">
         <div class="card-title">
           <span class="emoji">📁</span>
-          Step 1: Load Export
+          Step 1: Load Menu JSON
         </div>
       </div>
 
@@ -462,50 +599,70 @@
         <button type="button" class="file-clear" id="file-clear" onclick="clearFile()" style="display:none">Remove</button>
       </div>
 
-      <div class="status-line" id="status-line"><span class="dot"></span> Ready for Menu Upload.</div>
+      <div class="status-line muted" id="status-line"><span class="dot"></span> Ready for Menu Upload.</div>
     </section>
 
-    <!-- Initial hint shown before a file is loaded -->
+    <!-- Initial hint -->
     <div class="hint" id="empty-hint">
       <div class="hint-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       </div>
       <div>
-        Upload your Flipdish menu export above. After upload, you'll be asked how you want the audit summary — on-screen or as a downloadable PDF.
+        Upload your Flipdish menu export above. Once it's loaded, you'll be able to add a location for competitive analysis, attach supporting business reports, and choose whether the audit should display on screen or download as a PDF.
       </div>
     </div>
 
-    <!-- Step 2 — revealed after successful upload -->
+    <!-- Step 2 — context (optional) + format + optimize -->
     <section class="card" id="step2" style="display:none">
       <div class="card-head">
         <div class="card-title">
           <span class="emoji">⚡</span>
-          Step 2: Menu Optimizer
+          Step 2: Optimize
         </div>
       </div>
 
-      <div class="format-question">How would you like your audit summary?</div>
-      <div class="format-row" id="format-row">
-        <button type="button" class="format-pill selected" data-format="screen" onclick="selectFormat('screen')">
-          <div class="pill-emoji">📺</div>
-          <div class="pill-text">
-            <span class="pill-title">View on screen</span>
-            <span class="pill-desc">Read in the browser, streamed live</span>
-          </div>
-        </button>
-        <button type="button" class="format-pill" data-format="pdf" onclick="selectFormat('pdf')">
-          <div class="pill-emoji">📄</div>
-          <div class="pill-text">
-            <span class="pill-title">Download as PDF</span>
-            <span class="pill-desc">Auto-downloads when ready</span>
-          </div>
-        </button>
+      <div class="field-block">
+        <label class="field-label" for="location-input">Restaurant location <span style="text-transform:none;color:var(--text-3);font-weight:500;letter-spacing:0">— optional</span></label>
+        <input type="text" class="text-input" id="location-input" placeholder="e.g. 109 Saint Margarets Road, Twickenham TW1 2LH" />
+        <div class="field-help">If provided, the audit includes a 45-mile-radius competitive comparison and revenue-strategy section.</div>
+      </div>
+
+      <div class="field-block">
+        <label class="field-label">Supporting business reports <span style="text-transform:none;color:var(--text-3);font-weight:500;letter-spacing:0">— optional</span></label>
+        <div class="reports-zone" id="reports-zone">
+          <button type="button" class="choose-btn" onclick="document.getElementById('reports-input').click()">Add Files</button>
+          <input type="file" id="reports-input" accept=".pdf,.txt,.md,.csv,application/pdf,text/plain,text/markdown,text/csv" multiple style="display:none" />
+          <span class="reports-hint">Drop PDFs, TXT, MD, or CSV here, or click Add Files</span>
+        </div>
+        <div class="reports-list" id="reports-list"></div>
+        <div class="field-help">Revenue reports, prior audits, customer feedback, sales data — anything that should inform the analysis. Text is extracted and sent to Claude.</div>
+      </div>
+
+      <div class="field-block">
+        <label class="field-label">Output format</label>
+        <div class="format-question">How would you like your audit summary?</div>
+        <div class="format-row" id="format-row">
+          <button type="button" class="format-pill selected" data-format="screen" onclick="selectFormat('screen')">
+            <div class="pill-emoji">📺</div>
+            <div class="pill-text">
+              <span class="pill-title">View on screen</span>
+              <span class="pill-desc">Read in the browser, streamed live</span>
+            </div>
+          </button>
+          <button type="button" class="format-pill" data-format="pdf" onclick="selectFormat('pdf')">
+            <div class="pill-emoji">📄</div>
+            <div class="pill-text">
+              <span class="pill-title">Download as PDF</span>
+              <span class="pill-desc">Auto-downloads when ready</span>
+            </div>
+          </button>
+        </div>
       </div>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
-          Full Optimize
+          <span id="analyze-btn-label">Full Optimize</span>
         </button>
       </div>
     </section>
@@ -533,35 +690,46 @@
             Full Analysis
           </div>
         </div>
-        <div class="analysis-output cursor" id="analysis-text"></div>
+        <div class="analysis-output" id="analysis-text"></div>
       </section>
     </div>
 
     <footer>Powered by Claude (Anthropic) · Flipdish menu team</footer>
   </main>
 
+  <!-- Hidden report template used to generate the downloadable PDF -->
+  <div id="report-template" aria-hidden="true">
+    <div class="report" id="report">
+      <div class="doc-header">
+        <div class="doc-title" id="report-title">Menu JSON Audit</div>
+        <div class="doc-subtitle">Menu JSON Audit &amp; Recommendations</div>
+        <div class="doc-meta" id="report-meta"></div>
+      </div>
+      <div id="report-body"></div>
+      <div class="end-rule">— End of audit —</div>
+    </div>
+  </div>
+
   <script>
     let currentMenu = null;
     let currentFileName = null;
     let lastAnalysisText = '';
+    let lastAnalysisHtml = '';
     let lastMetrics = null;
-    let outputFormat = 'screen'; // 'screen' or 'pdf'
+    let outputFormat = 'screen';
+    let supportingReports = []; // [{ name, content, size }]
 
-    function selectFormat(fmt) {
-      outputFormat = fmt;
-      document.querySelectorAll('.format-pill').forEach(el => {
-        el.classList.toggle('selected', el.dataset.format === fmt);
-      });
-      const btn = document.getElementById('analyze-btn');
-      btn.lastChild.textContent = fmt === 'pdf' ? ' Optimize & Download PDF' : ' Full Optimize';
+    if (window.marked) {
+      marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false });
     }
 
+    // ----- Step 1: menu JSON file -----
     const fileInput = document.getElementById('file-input');
     const dropZone = document.getElementById('drop-zone');
     const statusLine = document.getElementById('status-line');
 
     fileInput.addEventListener('change', e => {
-      if (e.target.files[0]) loadFile(e.target.files[0]);
+      if (e.target.files[0]) loadMenuFile(e.target.files[0]);
     });
 
     ['dragenter','dragover'].forEach(ev =>
@@ -570,10 +738,10 @@
       dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragging'); }));
     dropZone.addEventListener('drop', e => {
       const file = e.dataTransfer.files[0];
-      if (file) loadFile(file);
+      if (file) loadMenuFile(file);
     });
 
-    function loadFile(file) {
+    function loadMenuFile(file) {
       if (!(file.type === 'application/json' || file.name.toLowerCase().endsWith('.json'))) {
         setStatus('error', 'Please choose a .json file.');
         return;
@@ -588,11 +756,7 @@
           document.getElementById('file-clear').style.display = 'block';
           dropZone.classList.add('has-file');
           setStatus('ok', 'Menu loaded · ready to optimize.');
-          const step2 = document.getElementById('step2');
-          step2.style.display = '';
-          step2.classList.remove('reveal'); void step2.offsetWidth; step2.classList.add('reveal');
-          document.getElementById('empty-hint').style.display = 'none';
-          step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          revealStep2();
         } catch (err) {
           setStatus('error', 'Invalid JSON: ' + err.message);
           currentMenu = null;
@@ -615,6 +779,14 @@
       document.getElementById('empty-hint').style.display = '';
     }
 
+    function revealStep2() {
+      const step2 = document.getElementById('step2');
+      step2.style.display = '';
+      step2.classList.remove('reveal'); void step2.offsetWidth; step2.classList.add('reveal');
+      document.getElementById('empty-hint').style.display = 'none';
+      step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     function setStatus(kind, text) {
       statusLine.className = 'status-line ' + (kind === 'ok' ? '' : kind);
       statusLine.innerHTML = '<span class="dot"></span> ' + text;
@@ -626,6 +798,87 @@
       return (b/1024/1024).toFixed(2) + ' MB';
     }
 
+    // ----- Supporting reports -----
+    const reportsInput = document.getElementById('reports-input');
+    const reportsZone = document.getElementById('reports-zone');
+
+    reportsInput.addEventListener('change', e => {
+      addReports(e.target.files);
+      reportsInput.value = '';
+    });
+    ['dragenter','dragover'].forEach(ev =>
+      reportsZone.addEventListener(ev, e => { e.preventDefault(); reportsZone.classList.add('dragging'); }));
+    ['dragleave','drop'].forEach(ev =>
+      reportsZone.addEventListener(ev, e => { e.preventDefault(); reportsZone.classList.remove('dragging'); }));
+    reportsZone.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) addReports(e.dataTransfer.files);
+    });
+
+    async function addReports(fileList) {
+      for (const file of Array.from(fileList)) {
+        const ext = file.name.toLowerCase().split('.').pop();
+        try {
+          let content;
+          if (ext === 'pdf') {
+            content = await extractPDFText(file);
+          } else if (['txt','md','markdown','csv','log'].includes(ext) || file.type.startsWith('text/')) {
+            content = await file.text();
+          } else {
+            setStatus('error', 'Unsupported report type: ' + file.name);
+            continue;
+          }
+          supportingReports.push({ name: file.name, content: content || '', size: file.size });
+          renderReports();
+        } catch (e) {
+          setStatus('error', 'Failed to read ' + file.name + ': ' + e.message);
+        }
+      }
+    }
+
+    async function extractPDFText(file) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const parts = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        parts.push(tc.items.map(it => it.str).join(' '));
+      }
+      return parts.join('\n\n').trim();
+    }
+
+    function renderReports() {
+      const list = document.getElementById('reports-list');
+      list.innerHTML = supportingReports.map((r, i) =>
+        '<span class="report-chip">' +
+          '<span class="name" title="' + escapeAttr(r.name) + '">' + escapeHtml(r.name) + '</span>' +
+          '<span class="size">' + formatBytes(r.size) + '</span>' +
+          '<span class="x" title="Remove" onclick="removeReport(' + i + ')">×</span>' +
+        '</span>'
+      ).join('');
+    }
+
+    function removeReport(i) {
+      supportingReports.splice(i, 1);
+      renderReports();
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s); }
+
+    // ----- Format chooser -----
+    function selectFormat(fmt) {
+      outputFormat = fmt;
+      document.querySelectorAll('.format-pill').forEach(el => {
+        el.classList.toggle('selected', el.dataset.format === fmt);
+      });
+      document.getElementById('analyze-btn-label').textContent =
+        fmt === 'pdf' ? 'Optimize & Download PDF' : 'Full Optimize';
+    }
+
+    // ----- Run analysis -----
     async function runAnalysis() {
       if (!currentMenu) {
         setStatus('error', 'Please choose a menu JSON file first.');
@@ -635,19 +888,23 @@
       const btn = document.getElementById('analyze-btn');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Optimizing…';
-      document.getElementById('empty-hint').style.display = 'none';
       document.getElementById('results').style.display = 'block';
-      document.getElementById('analysis-text').textContent = '';
+      document.getElementById('analysis-text').innerHTML = '';
       document.getElementById('metrics-grid').innerHTML = renderSkeletons();
       document.getElementById('download-btn').style.display = 'none';
-      lastAnalysisText = '';
-      lastMetrics = null;
+      lastAnalysisText = ''; lastAnalysisHtml = ''; lastMetrics = null;
+
+      const location = (document.getElementById('location-input').value || '').trim();
 
       try {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ menu: currentMenu }),
+          body: JSON.stringify({
+            menu: currentMenu,
+            location: location || undefined,
+            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+          }),
         });
 
         if (!response.ok) {
@@ -658,12 +915,20 @@
         }
 
         const analysisEl = document.getElementById('analysis-text');
-        analysisEl.classList.add('cursor');
-
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
         let metricsExtracted = false;
+        let renderTimer = null;
+
+        const scheduleRender = () => {
+          if (renderTimer) return;
+          renderTimer = setTimeout(() => {
+            renderTimer = null;
+            const md = lastAnalysisText + '\n\n▋';
+            analysisEl.innerHTML = window.marked ? marked.parse(md) : escapeHtml(md);
+          }, 80);
+        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -688,12 +953,16 @@
                   }
                 }
                 lastAnalysisText = fullText.replace(/<<<JSON[\s\S]*?JSON>>>\n?/, '').trim();
-                analysisEl.textContent = lastAnalysisText;
+                scheduleRender();
               }
             } catch (e) {}
           }
         }
-        analysisEl.classList.remove('cursor');
+
+        // Final render without cursor
+        lastAnalysisHtml = window.marked ? marked.parse(lastAnalysisText) : escapeHtml(lastAnalysisText);
+        analysisEl.innerHTML = lastAnalysisHtml;
+
         document.getElementById('download-btn').style.display = 'inline-flex';
         if (outputFormat === 'pdf') {
           setStatus('ok', 'Optimization complete · downloading PDF…');
@@ -711,7 +980,9 @@
     function resetBtn() {
       const btn = document.getElementById('analyze-btn');
       btn.disabled = false;
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg> Full Optimize';
+      btn.innerHTML =
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>' +
+        '<span id="analyze-btn-label">' + (outputFormat === 'pdf' ? 'Optimize & Download PDF' : 'Full Optimize') + '</span>';
     }
 
     function renderSkeletons() {
@@ -740,72 +1011,45 @@
       ).join('');
     }
 
+    // ----- PDF generation via html2pdf -----
     function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const margin = 48;
-      let y = margin;
+      const reportBody = document.getElementById('report-body');
+      const reportMeta = document.getElementById('report-meta');
+      const reportTitle = document.getElementById('report-title');
 
-      // Header bar
-      doc.setFillColor(124, 58, 237); // purple
-      doc.rect(0, 0, pageW, 6, 'F');
-      y += 8;
+      const restaurantName = guessRestaurantName(currentMenu) ||
+        (currentFileName || '').replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() ||
+        'Menu';
+      reportTitle.textContent = restaurantName.toUpperCase();
 
-      doc.setFont('helvetica', 'bold').setFontSize(22).setTextColor(20);
-      doc.text('Menu Audit Report', margin, y); y += 8;
+      const location = (document.getElementById('location-input').value || '').trim();
+      const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      const lines = [];
+      if (location) lines.push(location);
+      lines.push('Prepared by the Flipdish Menu Team · ' + dateStr);
+      if (supportingReports.length) lines.push('Includes ' + supportingReports.length + ' supporting business report(s)');
+      reportMeta.innerHTML = lines.map(escapeHtml).join('<br/>');
 
-      doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(120);
-      const meta = (currentFileName ? currentFileName + ' · ' : '') +
-                   new Date().toLocaleString() + ' · Flipdish Menu Team';
-      y += 14; doc.text(meta, margin, y); y += 22;
-
-      doc.setDrawColor(220).setLineWidth(0.5).line(margin, y, pageW - margin, y); y += 22;
-
-      // Summary
-      if (lastMetrics) {
-        doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(20);
-        doc.text('Summary', margin, y); y += 18;
-
-        const rows = [
-          ['Items',           lastMetrics.items],
-          ['Categories',      lastMetrics.categories],
-          ['Item images',     lastMetrics.item_images],
-          ['Category images', lastMetrics.category_images],
-          ['Upsells',         lastMetrics.upsells],
-        ];
-        doc.setFontSize(11);
-        for (const [label, val] of rows) {
-          doc.setFont('helvetica', 'normal').setTextColor(110).text(label, margin, y);
-          doc.setFont('helvetica', 'bold').setTextColor(20).text(String(val ?? '—'), margin + 200, y);
-          y += 17;
-        }
-        y += 14;
-      }
-
-      // Analysis
-      doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(20);
-      doc.text('Full analysis', margin, y); y += 18;
-
-      doc.setFont('helvetica', 'normal').setFontSize(10.5).setTextColor(40);
-      const lines = doc.splitTextToSize(lastAnalysisText || '(no analysis text)', pageW - margin * 2);
-      for (const line of lines) {
-        if (y > pageH - margin) { doc.addPage(); y = margin; }
-        doc.text(line, margin, y); y += 14;
-      }
-
-      // Footer on each page
-      const pages = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pages; i++) {
-        doc.setPage(i);
-        doc.setFontSize(9).setTextColor(160);
-        doc.text('Generated by Menu Analyzer · Flipdish', margin, pageH - 24);
-        doc.text(i + ' / ' + pages, pageW - margin, pageH - 24, { align: 'right' });
-      }
+      reportBody.innerHTML = lastAnalysisHtml || '<p>(no analysis content)</p>';
 
       const stamp = new Date().toISOString().slice(0,10);
-      doc.save('menu-audit-' + stamp + '.pdf');
+      const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
+      const filename = safeName + '_Menu_Audit_' + stamp + '.pdf';
+
+      html2pdf().set({
+        margin: [10, 0, 14, 0],
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      }).from(document.getElementById('report')).save();
+    }
+
+    function guessRestaurantName(menu) {
+      if (!menu || typeof menu !== 'object') return null;
+      return menu.name || menu.restaurantName || menu.storeName ||
+             menu.restaurant?.name || menu.store?.name || null;
     }
   </script>
 </body>
