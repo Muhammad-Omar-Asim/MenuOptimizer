@@ -558,6 +558,121 @@
       .format-row { grid-template-columns: 1fr; }
     }
 
+    /* Footer link */
+    .footer-link {
+      background: none; border: none; padding: 0;
+      color: var(--text-2); cursor: pointer;
+      font: inherit; font-size: 12px;
+      text-decoration: underline; text-underline-offset: 3px;
+      text-decoration-color: var(--text-3);
+    }
+    .footer-link:hover { color: var(--text); text-decoration-color: var(--purple); }
+
+    /* Prompt-viewer modal */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(7, 9, 15, 0.55);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+    [data-theme="dark"] .modal-backdrop { background: rgba(0, 0, 0, 0.65); }
+
+    .modal {
+      width: min(960px, 100%);
+      max-height: calc(100vh - 48px);
+      background: var(--surface-solid);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      box-shadow: 0 20px 80px rgba(15, 23, 42, 0.25);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-head h2 {
+      font-size: 16px; font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .modal-head .stats {
+      font: 11.5px 'DM Mono', monospace;
+      color: var(--text-3);
+      text-align: right;
+    }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--pill); color: var(--text-2);
+      cursor: pointer; display: grid; place-items: center;
+      font-size: 18px; line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .modal-close:hover { background: var(--pill-hover); color: var(--text); }
+    .modal-tabs {
+      display: flex; gap: 4px;
+      padding: 8px 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-tab {
+      padding: 8px 14px;
+      border: none; background: transparent;
+      color: var(--text-3);
+      font: 600 13px 'DM Sans', sans-serif;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .modal-tab:hover { color: var(--text-2); }
+    .modal-tab.active {
+      color: var(--purple);
+      border-bottom-color: var(--purple);
+    }
+    .modal-body { flex: 1; overflow: auto; }
+    .modal-pane { display: none; padding: 16px 20px; }
+    .modal-pane.active { display: block; }
+    .pane-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 10px;
+      font: 12px 'DM Mono', monospace;
+      color: var(--text-3);
+    }
+    .pane-toolbar .copy-btn {
+      padding: 6px 12px;
+      background: var(--pill); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius-pill);
+      font: 600 12px 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pane-toolbar .copy-btn:hover { background: var(--pill-hover); border-color: var(--border-strong); }
+    .pane-toolbar .copy-btn.copied { background: rgba(52,211,153,0.18); color: var(--mint); border-color: var(--mint); }
+    .modal-pre {
+      background: var(--sub-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font: 12.5px/1.65 'DM Mono', monospace;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 60vh; overflow: auto;
+    }
+    .modal-loading, .modal-error {
+      padding: 32px; text-align: center;
+      color: var(--text-3); font-size: 13px;
+    }
+    .modal-error { color: var(--rose); }
+
+    @media (max-width: 640px) {
+      .modal { max-height: 100vh; border-radius: 0; }
+      .modal-backdrop { padding: 0; }
+    }
+
     /* Bottom action bar */
     .bottom-actions {
       margin-top: 1.25rem;
@@ -722,8 +837,47 @@
       </div>
     </div>
 
-    <footer>Powered by Claude (Anthropic) · Flipdish menu team</footer>
+    <footer>
+      <button type="button" class="footer-link" onclick="openPromptViewer()">View prompts</button>
+      &nbsp;·&nbsp; Powered by Claude (Anthropic) · Flipdish menu team
+    </footer>
   </main>
+
+  <!-- Prompt viewer modal -->
+  <div class="modal-backdrop" id="prompt-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h2 id="prompt-modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          Prompts being sent to Claude
+        </h2>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div class="stats" id="prompt-stats"></div>
+          <button type="button" class="modal-close" aria-label="Close" onclick="closePromptViewer()">×</button>
+        </div>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="analyze" onclick="switchPromptTab('analyze')">Analyze · first pass</button>
+        <button class="modal-tab" data-tab="review" onclick="switchPromptTab('review')">Review · confirmatory check</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-pane active" id="pane-analyze">
+          <div class="pane-toolbar">
+            <span id="analyze-meta">First-pass audit prompt</span>
+            <button type="button" class="copy-btn" onclick="copyPrompt('analyze', this)">Copy</button>
+          </div>
+          <pre class="modal-pre" id="prompt-analyze">Loading…</pre>
+        </div>
+        <div class="modal-pane" id="pane-review">
+          <div class="pane-toolbar">
+            <span id="review-meta">Confirmatory-check prompt (uses last first-pass output if present)</span>
+            <button type="button" class="copy-btn" onclick="copyPrompt('review', this)">Copy</button>
+          </div>
+          <pre class="modal-pre" id="prompt-review">Loading…</pre>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     let currentMenu = null;
@@ -745,6 +899,102 @@
       else document.documentElement.removeAttribute('data-theme');
       try { localStorage.setItem('menu-analyzer-theme', next); } catch (_) {}
     }
+
+    // ----- Prompt viewer -----
+    async function openPromptViewer() {
+      const modal = document.getElementById('prompt-modal');
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      const analyzeEl = document.getElementById('prompt-analyze');
+      const reviewEl = document.getElementById('prompt-review');
+      analyzeEl.textContent = 'Loading…';
+      reviewEl.textContent = 'Loading…';
+      document.getElementById('prompt-stats').textContent = '';
+
+      const location = (document.getElementById('location-input')?.value || '').trim();
+      const body = {
+        menu: currentMenu || undefined,
+        location: location || undefined,
+        supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+        firstPassAudit: lastAnalysisText || undefined,
+      };
+
+      try {
+        const res = await fetch('/api/prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err?.error || (res.status + ' ' + res.statusText));
+        }
+        const data = await res.json();
+        analyzeEl.textContent = data.analyze || '(empty)';
+        reviewEl.textContent = data.review || '(empty)';
+
+        const stats = [];
+        stats.push('model: ' + (data.model || '—'));
+        stats.push('max_tokens: ' + (data.max_tokens || '—'));
+        if (data.slim_stats) {
+          stats.push('menu: ' + Math.round(data.slim_stats.original_chars / 1000) + 'KB → ' +
+                     Math.round(data.slim_stats.slimmed_chars / 1000) + 'KB (' +
+                     '−' + data.slim_stats.reduction_pct + '%)');
+        }
+        if (data.reports_count) stats.push('reports: ' + data.reports_count);
+        document.getElementById('prompt-stats').textContent = stats.join(' · ');
+
+        document.getElementById('analyze-meta').textContent =
+          'First-pass audit prompt · ' + (analyzeEl.textContent.length.toLocaleString()) + ' chars';
+        document.getElementById('review-meta').textContent =
+          (lastAnalysisText
+            ? 'Confirmatory-check prompt · '
+            : 'Confirmatory-check prompt (showing template — run an analysis to see your audit injected) · ') +
+          reviewEl.textContent.length.toLocaleString() + ' chars';
+      } catch (e) {
+        analyzeEl.textContent = 'Failed to load prompts: ' + e.message;
+        reviewEl.textContent = 'Failed to load prompts: ' + e.message;
+      }
+    }
+
+    function closePromptViewer() {
+      document.getElementById('prompt-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    function switchPromptTab(name) {
+      document.querySelectorAll('.modal-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === name);
+      });
+      document.querySelectorAll('.modal-pane').forEach(el => {
+        el.classList.toggle('active', el.id === 'pane-' + name);
+      });
+    }
+
+    async function copyPrompt(name, btn) {
+      const el = document.getElementById('prompt-' + name);
+      try {
+        await navigator.clipboard.writeText(el.textContent);
+        const original = btn.textContent;
+        btn.textContent = 'Copied ✓';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+      } catch (e) {
+        btn.textContent = 'Copy failed';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+      }
+    }
+
+    // Close modal on Escape or backdrop click
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('prompt-modal').style.display !== 'none') {
+        closePromptViewer();
+      }
+    });
+    document.getElementById('prompt-modal').addEventListener('click', e => {
+      if (e.target.id === 'prompt-modal') closePromptViewer();
+    });
 
     // ----- Step 1: menu JSON file -----
     const fileInput = document.getElementById('file-input');
