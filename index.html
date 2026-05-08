@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu Analyzer · Flipdish</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
     if (window.pdfjsLib) {
@@ -557,99 +558,30 @@
       .format-row { grid-template-columns: 1fr; }
     }
 
-    /* ============================================================
-       Hidden light-themed report template — rendered to PDF only
-       ============================================================ */
-    #report-template {
-      position: absolute; left: 0; top: 0;
-      z-index: -1; opacity: 0;
-      pointer-events: none;
-      width: 794px;
+    /* Bottom action bar */
+    .bottom-actions {
+      margin-top: 1.25rem;
+      padding: 1.25rem 0 0;
+      display: flex; justify-content: center;
+      gap: 12px; flex-wrap: wrap;
     }
-    .report {
-      width: 794px; /* ≈ A4 width @ 96dpi */
-      padding: 56px 56px 48px;
-      background: #ffffff;
-      color: #1a1a1a;
-      font-family: 'DM Sans', -apple-system, system-ui, sans-serif;
-      font-size: 11.5pt;
-      line-height: 1.55;
+    .bottom-actions .btn { padding: 14px 28px; }
+
+    /* Review status banner */
+    .review-banner {
+      margin-bottom: 1rem;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(167,139,250,0.08);
+      font-size: 13px; color: var(--text-2);
+      display: flex; align-items: center; gap: 10px;
     }
-    .report .doc-header {
-      text-align: center;
-      margin-bottom: 28px;
-      padding-bottom: 18px;
-      border-bottom: 2px solid #d4af37;
+    .review-banner .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-weight: 600; color: var(--purple);
     }
-    .report .doc-title {
-      font-family: 'Playfair Display', 'DM Sans', serif;
-      font-size: 28pt; font-weight: 700;
-      color: #1d3557;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    .report .doc-subtitle {
-      font-size: 14pt; color: #b03333;
-      font-style: italic;
-      margin-bottom: 6px;
-    }
-    .report .doc-meta {
-      font-size: 10.5pt; color: #555;
-      line-height: 1.5;
-    }
-    .report h2 {
-      font-size: 16pt; color: #1d3557; font-weight: 700;
-      margin: 22pt 0 10pt;
-      padding-bottom: 5pt;
-      border-bottom: 2px solid #d4af37;
-      page-break-after: avoid;
-    }
-    .report h2:first-of-type { margin-top: 8pt; }
-    .report h3 {
-      font-size: 12.5pt; color: #b03333; font-weight: 700;
-      margin: 14pt 0 7pt;
-      page-break-after: avoid;
-    }
-    .report p { margin-bottom: 8pt; }
-    .report ul, .report ol { padding-left: 18pt; margin-bottom: 9pt; }
-    .report li { margin-bottom: 3pt; }
-    .report strong { font-weight: 700; color: #1a1a1a; }
-    .report em { color: #555; font-style: italic; }
-    .report code {
-      font-family: 'DM Mono', monospace;
-      background: #f0ece0;
-      padding: 1pt 4pt;
-      border-radius: 3px;
-      font-size: 10pt;
-      color: #1d3557;
-    }
-    .report table {
-      width: 100%; border-collapse: collapse;
-      margin: 9pt 0 13pt;
-      font-size: 10pt;
-      page-break-inside: avoid;
-    }
-    .report th {
-      background: #1d3557; color: #ffffff;
-      padding: 8pt 10pt; text-align: left;
-      font-weight: 600;
-      font-size: 10pt;
-    }
-    .report td {
-      border: 1px solid #e0d8c5;
-      padding: 7pt 10pt;
-      vertical-align: top;
-    }
-    .report tr:nth-child(even) td { background: #faf6ec; }
-    .report .end-rule {
-      text-align: center;
-      font-style: italic;
-      color: #888;
-      margin-top: 22pt;
-      padding-top: 14pt;
-      border-top: 1px solid #e0d8c5;
-    }
+    .review-banner.done .badge { color: var(--mint); }
   </style>
 </head>
 <body>
@@ -761,10 +693,6 @@
             <span class="emoji">📊</span>
             Audit Summary
           </div>
-          <button class="btn btn-outline-pink" id="download-btn" onclick="downloadPDF()" style="display:none">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
-            Download PDF
-          </button>
         </div>
         <div class="metrics-grid" id="metrics-grid"></div>
       </section>
@@ -776,25 +704,26 @@
             Full Analysis
           </div>
         </div>
+        <div class="review-banner" id="review-banner" style="display:none">
+          <span class="badge" id="review-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Confirmatory check
+          </span>
+          <span id="review-status-text">Reviewing first-pass audit against the gold-standard sample…</span>
+        </div>
         <div class="analysis-output" id="analysis-text"></div>
       </section>
+
+      <div class="bottom-actions" id="bottom-actions" style="display:none">
+        <button class="btn btn-primary" id="download-btn" onclick="downloadPDF()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+          Download PDF
+        </button>
+      </div>
     </div>
 
     <footer>Powered by Claude (Anthropic) · Flipdish menu team</footer>
   </main>
-
-  <!-- Hidden report template used to generate the downloadable PDF -->
-  <div id="report-template" aria-hidden="true">
-    <div class="report" id="report">
-      <div class="doc-header">
-        <div class="doc-title" id="report-title">Menu JSON Audit</div>
-        <div class="doc-subtitle">Menu JSON Audit &amp; Recommendations</div>
-        <div class="doc-meta" id="report-meta"></div>
-      </div>
-      <div id="report-body"></div>
-      <div class="end-rule">— End of audit —</div>
-    </div>
-  </div>
 
   <script>
     let currentMenu = null;
@@ -870,6 +799,8 @@
       setStatus('muted', 'Ready for Menu Upload.');
       document.getElementById('step2').style.display = 'none';
       document.getElementById('results').style.display = 'none';
+      document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('review-banner').style.display = 'none';
       document.getElementById('empty-hint').style.display = '';
     }
 
@@ -972,7 +903,16 @@
         fmt === 'pdf' ? 'Optimize & Download PDF' : 'Full Optimize';
     }
 
-    // ----- Run analysis -----
+    function stripMetricMarkers(s) {
+      // Robust strip: handles missing >>> closer, extra whitespace, multiple blocks
+      return s
+        .replace(/<<<\s*JSON[\s\S]*?JSON\s*>>>/g, '')
+        .replace(/<<<\s*JSON[\s\S]*?(?=\n##|\n\n[A-Z])/g, '')
+        .replace(/<<<\s*JSON\s*\{[^}]*\}\s*JSON\s*>?>?>?/g, '')
+        .trim();
+    }
+
+    // ----- Run analysis (two-stage: analyze → review) -----
     async function runAnalysis() {
       if (!currentMenu) {
         setStatus('error', 'Please choose a menu JSON file first.');
@@ -981,49 +921,118 @@
 
       const btn = document.getElementById('analyze-btn');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Optimizing…';
+      btn.innerHTML = '<span class="spinner"></span> Running first-pass audit…';
       document.getElementById('results').style.display = 'block';
       document.getElementById('analysis-text').innerHTML = '';
       document.getElementById('metrics-grid').innerHTML = renderSkeletons();
-      document.getElementById('download-btn').style.display = 'none';
+      document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('review-banner').style.display = 'none';
       lastAnalysisText = ''; lastAnalysisHtml = ''; lastMetrics = null;
 
       const location = (document.getElementById('location-input').value || '').trim();
 
       try {
-        const response = await fetch('/api/analyze', {
+        const firstPass = await streamAudit('/api/analyze', {
+          menu: currentMenu,
+          location: location || undefined,
+          supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+        });
+        if (!firstPass) { resetBtn(); return; }
+
+        // Kick off the confirmatory review pass
+        btn.innerHTML = '<span class="spinner"></span> Running confirmatory check…';
+        const banner = document.getElementById('review-banner');
+        const bannerText = document.getElementById('review-status-text');
+        banner.style.display = 'flex';
+        banner.classList.remove('done');
+        bannerText.textContent = 'Reviewing first-pass audit against the gold-standard sample…';
+
+        const reviewed = await streamAudit('/api/review', {
+          location: location || undefined,
+          supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+          firstPassAudit: lastAnalysisText,
+        }, { isReview: true });
+
+        if (reviewed) {
+          banner.classList.add('done');
+          bannerText.textContent = 'Reviewed against gold-standard sample · ready to download.';
+          document.getElementById('bottom-actions').style.display = 'flex';
+          if (outputFormat === 'pdf') {
+            setStatus('ok', 'Audit complete · downloading PDF…');
+            setTimeout(downloadPDF, 300);
+          } else {
+            setStatus('ok', 'Audit complete.');
+          }
+        }
+      } catch (e) {
+        setStatus('error', 'Network error: ' + e.message);
+      }
+
+      resetBtn();
+    }
+
+    async function streamAudit(endpoint, body, opts) {
+      opts = opts || {};
+      const analysisEl = document.getElementById('analysis-text');
+      const previousText = lastAnalysisText;
+      const previousHtml = lastAnalysisHtml;
+
+      let response;
+      try {
+        response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            menu: currentMenu,
-            location: location || undefined,
-            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
-          }),
+          body: JSON.stringify(body),
         });
-
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          setStatus('error', 'Server error ' + response.status + ': ' + (err?.error || response.statusText));
-          resetBtn();
-          return;
+      } catch (e) {
+        if (opts.isReview) {
+          lastAnalysisText = previousText;
+          lastAnalysisHtml = previousHtml;
+          analysisEl.innerHTML = previousHtml;
+          setStatus('error', 'Confirmatory check failed (network): ' + e.message + ' — keeping first-pass audit.');
+        } else {
+          setStatus('error', 'Network error: ' + e.message);
         }
+        return false;
+      }
 
-        const analysisEl = document.getElementById('analysis-text');
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        let metricsExtracted = false;
-        let renderTimer = null;
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = 'Server error ' + response.status + ': ' + (err?.error || response.statusText);
+        if (opts.isReview) {
+          lastAnalysisText = previousText;
+          lastAnalysisHtml = previousHtml;
+          analysisEl.innerHTML = previousHtml;
+          setStatus('error', 'Confirmatory check failed — keeping first-pass audit. ' + msg);
+        } else {
+          setStatus('error', msg);
+        }
+        return false;
+      }
 
-        const scheduleRender = () => {
-          if (renderTimer) return;
-          renderTimer = setTimeout(() => {
-            renderTimer = null;
-            const md = lastAnalysisText + '\n\n▋';
-            analysisEl.innerHTML = window.marked ? marked.parse(md) : escapeHtml(md);
-          }, 80);
-        };
+      // For the review pass, clear the on-screen content so the revised version replaces it cleanly.
+      let cleared = false;
+      if (opts.isReview) {
+        // Defer the clear until first delta arrives so an immediate failure leaves the first-pass intact.
+      }
 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let metricsExtracted = !!lastMetrics;
+      let renderTimer = null;
+      let receivedAny = false;
+
+      const scheduleRender = () => {
+        if (renderTimer) return;
+        renderTimer = setTimeout(() => {
+          renderTimer = null;
+          const md = lastAnalysisText + '\n\n▋';
+          analysisEl.innerHTML = window.marked ? marked.parse(md) : escapeHtml(md);
+        }, 80);
+      };
+
+      try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -1035,9 +1044,15 @@
             try {
               const obj = JSON.parse(data);
               if (obj.type === 'content_block_delta' && obj.delta?.text) {
+                if (opts.isReview && !cleared) {
+                  cleared = true;
+                  lastAnalysisText = '';
+                  fullText = '';
+                }
                 fullText += obj.delta.text;
+                receivedAny = true;
                 if (!metricsExtracted && fullText.includes('JSON>>>')) {
-                  const match = fullText.match(/<<<JSON\s*([\s\S]*?)\s*JSON>>>/);
+                  const match = fullText.match(/<<<\s*JSON\s*([\s\S]*?)\s*JSON\s*>>>/);
                   if (match) {
                     try {
                       lastMetrics = JSON.parse(match[1]);
@@ -1046,29 +1061,28 @@
                     } catch (e) {}
                   }
                 }
-                lastAnalysisText = fullText.replace(/<<<JSON[\s\S]*?JSON>>>\n?/, '').trim();
+                lastAnalysisText = stripMetricMarkers(fullText);
                 scheduleRender();
               }
             } catch (e) {}
           }
         }
-
-        // Final render without cursor
-        lastAnalysisHtml = window.marked ? marked.parse(lastAnalysisText) : escapeHtml(lastAnalysisText);
-        analysisEl.innerHTML = lastAnalysisHtml;
-
-        document.getElementById('download-btn').style.display = 'inline-flex';
-        if (outputFormat === 'pdf') {
-          setStatus('ok', 'Optimization complete · downloading PDF…');
-          setTimeout(downloadPDF, 250);
-        } else {
-          setStatus('ok', 'Optimization complete.');
-        }
       } catch (e) {
-        setStatus('error', 'Network error: ' + e.message);
+        if (opts.isReview && !receivedAny) {
+          lastAnalysisText = previousText;
+          lastAnalysisHtml = previousHtml;
+          analysisEl.innerHTML = previousHtml;
+          setStatus('error', 'Confirmatory check stream failed — keeping first-pass audit. ' + e.message);
+          return false;
+        }
+        setStatus('error', 'Stream error: ' + e.message);
+        return false;
       }
 
-      resetBtn();
+      // Final render without cursor
+      lastAnalysisHtml = window.marked ? marked.parse(lastAnalysisText) : escapeHtml(lastAnalysisText);
+      analysisEl.innerHTML = lastAnalysisHtml;
+      return true;
     }
 
     function resetBtn() {
@@ -1105,76 +1119,207 @@
       ).join('');
     }
 
-    // ----- PDF generation via html2pdf -----
-    async function downloadPDF() {
-      const reportBody = document.getElementById('report-body');
-      const reportMeta = document.getElementById('report-meta');
-      const reportTitle = document.getElementById('report-title');
-      const tpl = document.getElementById('report-template');
-      const reportEl = document.getElementById('report');
-
-      const restaurantName = guessRestaurantName(currentMenu) ||
-        (currentFileName || '').replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() ||
-        'Menu';
-      reportTitle.textContent = restaurantName.toUpperCase();
-
-      const location = (document.getElementById('location-input').value || '').trim();
-      const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-      const lines = [];
-      if (location) lines.push(location);
-      lines.push('Prepared by the Flipdish Menu Team · ' + dateStr);
-      if (supportingReports.length) lines.push('Includes ' + supportingReports.length + ' supporting business report(s)');
-      reportMeta.innerHTML = lines.map(escapeHtml).join('<br/>');
-
-      const html = lastAnalysisHtml ||
-        (window.marked ? marked.parse(lastAnalysisText || '') : escapeHtml(lastAnalysisText || ''));
-      reportBody.innerHTML = html || '<p>(no analysis content — try running the optimization again)</p>';
-
-      const stamp = new Date().toISOString().slice(0,10);
-      const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
-      const filename = safeName + '_Menu_Audit_' + stamp + '.pdf';
-
-      // Bring template fully on-screen for html2canvas to capture reliably,
-      // but keep it transparent so the user doesn't see a flash.
-      const prevOpacity = tpl.style.opacity;
-      const prevZIndex = tpl.style.zIndex;
-      tpl.style.opacity = '0';
-      tpl.style.zIndex = '9999';
-
-      try {
-        if (document.fonts && document.fonts.ready) {
-          try { await document.fonts.ready; } catch (_) {}
-        }
-        // Yield a frame so layout settles after we just set innerHTML
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        await html2pdf().set({
-          margin: [10, 0, 14, 0],
-          filename,
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: 794
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'] }
-        }).from(reportEl).save();
-      } catch (e) {
-        console.error('PDF generation failed:', e);
-        setStatus('error', 'PDF generation failed: ' + (e?.message || e));
-      } finally {
-        tpl.style.opacity = prevOpacity;
-        tpl.style.zIndex = prevZIndex;
-      }
-    }
-
+    // ----- PDF generation via jsPDF + autoTable -----
     function guessRestaurantName(menu) {
       if (!menu || typeof menu !== 'object') return null;
       return menu.name || menu.restaurantName || menu.storeName ||
              menu.restaurant?.name || menu.store?.name || null;
+    }
+
+    // Strip Markdown inline formatting that jsPDF can't render (we render bold via setFont).
+    function stripInlineMd(s) {
+      return String(s)
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/__(.+?)__/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 56;
+      const contentW = pageW - margin * 2;
+
+      // Brand colors
+      const NAVY = [29, 53, 87];
+      const NAVY_RGB = '#1d3557';
+      const GOLD = [212, 175, 55];
+      const RUBY = [176, 51, 51];
+      const TEXT = [26, 26, 26];
+      const MUTED = [100, 100, 100];
+      const ZEBRA = [250, 246, 236];
+      const BORDER = [224, 216, 197];
+
+      let y = margin;
+
+      const restaurantName = guessRestaurantName(currentMenu) ||
+        (currentFileName || '').replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() ||
+        'Menu';
+      const location = (document.getElementById('location-input').value || '').trim();
+      const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+      // ---- Cover header ----
+      doc.setFont('times', 'bold').setFontSize(22).setTextColor(...NAVY);
+      doc.text(restaurantName.toUpperCase(), pageW / 2, y + 8, { align: 'center' });
+      y += 30;
+
+      doc.setFont('times', 'italic').setFontSize(13).setTextColor(...RUBY);
+      doc.text('Menu JSON Audit & Recommendations', pageW / 2, y, { align: 'center' });
+      y += 22;
+
+      doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...MUTED);
+      const metaLines = [];
+      if (location) metaLines.push(location);
+      metaLines.push('Prepared by the Flipdish Menu Team · ' + dateStr);
+      if (supportingReports.length) metaLines.push('Includes ' + supportingReports.length + ' supporting business report(s)');
+      metaLines.push('Reviewed against gold-standard audit template');
+      for (const ml of metaLines) {
+        doc.text(ml, pageW / 2, y, { align: 'center' });
+        y += 13;
+      }
+
+      // Gold rule
+      y += 6;
+      doc.setDrawColor(...GOLD).setLineWidth(2);
+      doc.line(margin, y, pageW - margin, y);
+      y += 18;
+
+      function ensureSpace(needed) {
+        if (y + needed > pageH - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      }
+
+      function renderH2(text) {
+        ensureSpace(40);
+        y += 8;
+        doc.setFont('helvetica', 'bold').setFontSize(15).setTextColor(...NAVY);
+        doc.text(text, margin, y);
+        y += 6;
+        doc.setDrawColor(...GOLD).setLineWidth(1.5);
+        doc.line(margin, y, pageW - margin, y);
+        y += 14;
+      }
+
+      function renderH3(text) {
+        ensureSpace(28);
+        y += 4;
+        doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...RUBY);
+        doc.text(text, margin, y);
+        y += 14;
+      }
+
+      function renderParagraph(text) {
+        if (!text.trim()) return;
+        doc.setFont('helvetica', 'normal').setFontSize(10.5).setTextColor(...TEXT);
+        const lines = doc.splitTextToSize(stripInlineMd(text), contentW);
+        for (const line of lines) {
+          ensureSpace(14);
+          doc.text(line, margin, y);
+          y += 13;
+        }
+        y += 4;
+      }
+
+      function renderList(items, ordered) {
+        doc.setFont('helvetica', 'normal').setFontSize(10.5).setTextColor(...TEXT);
+        items.forEach((item, idx) => {
+          const bullet = ordered ? (idx + 1) + '.' : '•';
+          const text = stripInlineMd(typeof item === 'string' ? item : item.text || '');
+          const lines = doc.splitTextToSize(text, contentW - 18);
+          for (let i = 0; i < lines.length; i++) {
+            ensureSpace(14);
+            if (i === 0) doc.text(bullet, margin, y);
+            doc.text(lines[i], margin + 16, y);
+            y += 13;
+          }
+        });
+        y += 4;
+      }
+
+      function renderTable(header, rows) {
+        const cleanedHeader = header.map(h => stripInlineMd(h));
+        const cleanedRows = rows.map(r => r.map(c => stripInlineMd(c)));
+        doc.autoTable({
+          startY: y,
+          head: [cleanedHeader],
+          body: cleanedRows,
+          margin: { left: margin, right: margin },
+          tableWidth: contentW,
+          styles: {
+            font: 'helvetica',
+            fontSize: 9.5,
+            textColor: TEXT,
+            cellPadding: 5,
+            overflow: 'linebreak',
+            valign: 'top',
+            lineColor: BORDER,
+            lineWidth: 0.4,
+          },
+          headStyles: {
+            fillColor: NAVY,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 9.5,
+          },
+          alternateRowStyles: { fillColor: ZEBRA },
+          theme: 'grid',
+        });
+        y = doc.lastAutoTable.finalY + 10;
+      }
+
+      // Parse markdown and render token-by-token
+      const md = lastAnalysisText || '(no analysis content)';
+      const tokens = window.marked ? marked.lexer(md) : [{ type: 'paragraph', text: md }];
+
+      for (const t of tokens) {
+        if (t.type === 'heading' && t.depth === 1) {
+          renderH2(t.text);
+        } else if (t.type === 'heading' && t.depth === 2) {
+          renderH2(t.text);
+        } else if (t.type === 'heading' && t.depth === 3) {
+          renderH3(t.text);
+        } else if (t.type === 'heading') {
+          renderH3(t.text);
+        } else if (t.type === 'paragraph') {
+          renderParagraph(t.text);
+        } else if (t.type === 'list') {
+          renderList(t.items, t.ordered);
+        } else if (t.type === 'table') {
+          const header = (t.header || []).map(h => h.text || h);
+          const rows = (t.rows || []).map(r => r.map(c => c.text || c));
+          renderTable(header, rows);
+        } else if (t.type === 'hr') {
+          ensureSpace(12);
+          doc.setDrawColor(...BORDER).setLineWidth(0.5);
+          doc.line(margin, y, pageW - margin, y);
+          y += 10;
+        } else if (t.type === 'space') {
+          y += 4;
+        } else if (t.type === 'blockquote') {
+          renderParagraph(t.text || (t.tokens || []).map(x => x.text).join(' '));
+        } else if (t.text) {
+          renderParagraph(t.text);
+        }
+      }
+
+      // Footer with page numbers
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont('helvetica', 'italic').setFontSize(8.5).setTextColor(...MUTED);
+        doc.text(restaurantName + ' · Menu JSON Audit', margin, pageH - 22);
+        doc.text('Page ' + i + ' of ' + totalPages, pageW - margin, pageH - 22, { align: 'right' });
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
+      doc.save(safeName + '_Menu_Audit_' + stamp + '.pdf');
     }
   </script>
 </body>

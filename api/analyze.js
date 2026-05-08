@@ -37,6 +37,46 @@ export default async function handler(req) {
   const location = (body?.location || '').toString().trim();
   const reports = Array.isArray(body?.supportingReports) ? body.supportingReports : [];
 
+  // Strip noise fields, base64 image data, HTML tags, and very long strings
+  // so a typical Flipdish export fits inside Sonnet 4.5's 200K context.
+  const NOISE_KEYS = new Set([
+    'createdAt','updatedAt','modifiedAt','deletedAt',
+    'imageBase64','imageData','imageBlob','rawHtml','rawHtmlContent',
+    'etag','hash','sha','signature','htmlBody','rawJson'
+  ]);
+  function slimMenu(v) {
+    if (v == null) return v;
+    if (typeof v === 'string') {
+      if (v.startsWith('data:image') || v.startsWith('data:application')) return '[binary]';
+      let s = v;
+      if (/<[a-z][^>]*>/i.test(s)) s = s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      if (s.length > 600) s = s.slice(0, 600) + `…[+${s.length - 600} chars]`;
+      return s;
+    }
+    if (Array.isArray(v)) return v.map(slimMenu);
+    if (typeof v === 'object') {
+      const out = {};
+      for (const [k, val] of Object.entries(v)) {
+        if (NOISE_KEYS.has(k)) continue;
+        out[k] = slimMenu(val);
+      }
+      return out;
+    }
+    return v;
+  }
+
+  const slim = slimMenu(menu);
+  const menuJson = JSON.stringify(slim);
+
+  // Hard char budget for prompt input (≈ tokens × 4). We reserve room for
+  // the audit instructions, the supporting reports, and the model's output.
+  const MAX_MENU_CHARS = 550_000;   // ~135K tokens
+  if (menuJson.length > MAX_MENU_CHARS) {
+    return new Response(JSON.stringify({
+      error: `Menu JSON is ${(menuJson.length/1000).toFixed(0)}KB after slimming, which exceeds the ${(MAX_MENU_CHARS/1000)}KB budget. Try removing base64 image data or splitting the menu into sections.`
+    }), { status: 413, headers: { 'Content-Type': 'application/json' } });
+  }
+
   const reportsBlock = reports.length
     ? `\n\nSUPPORTING BUSINESS REPORTS — use these as additional context when forming recommendations. Cite figures from them when relevant.\n\n` +
       reports.map(r => `=== ${String(r?.name || 'report').slice(0, 120)} ===\n${String(r?.content || '').slice(0, 60000)}`).join('\n\n')
@@ -114,9 +154,9 @@ For every suggestion, include a brief reason and the analysis behind it.` : ''}
 
 End the audit with the literal line: *— End of audit —*
 
-MENU JSON:
+MENU JSON (pre-processed: HTML stripped, binary blobs replaced with [binary], very long strings truncated):
 \`\`\`json
-${JSON.stringify(menu, null, 2)}
+${menuJson}
 \`\`\`${reportsBlock}`;
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
