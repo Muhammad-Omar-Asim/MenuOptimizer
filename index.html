@@ -1413,9 +1413,14 @@
       const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 
       // ---- Cover header ----
-      doc.setFont('times', 'bold').setFontSize(22).setTextColor(...NAVY);
-      doc.text(restaurantName.toUpperCase(), pageW / 2, y + 8, { align: 'center' });
-      y += 30;
+      // Thin gold rule above the title, for symmetry with the rule below.
+      doc.setDrawColor(...GOLD).setLineWidth(0.8);
+      doc.line(margin + 60, y, pageW - margin - 60, y);
+      y += 22;
+
+      doc.setFont('times', 'bold').setFontSize(24).setTextColor(...NAVY);
+      doc.text(restaurantName.toUpperCase(), pageW / 2, y, { align: 'center' });
+      y += 24;
 
       doc.setFont('times', 'italic').setFontSize(13).setTextColor(...RUBY);
       doc.text('Menu JSON Audit & Recommendations', pageW / 2, y, { align: 'center' });
@@ -1429,14 +1434,14 @@
       metaLines.push('Reviewed against gold-standard audit template');
       for (const ml of metaLines) {
         doc.text(ml, pageW / 2, y, { align: 'center' });
-        y += 13;
+        y += 14;
       }
 
-      // Gold rule
-      y += 6;
+      // Bold gold rule below the meta block — separates cover from body.
+      y += 8;
       doc.setDrawColor(...GOLD).setLineWidth(2);
       doc.line(margin, y, pageW - margin, y);
-      y += 18;
+      y += 16;
 
       function ensureSpace(needed) {
         if (y + needed > pageH - margin) {
@@ -1446,19 +1451,19 @@
       }
 
       function renderH2(text) {
-        ensureSpace(40);
-        y += 8;
-        doc.setFont('helvetica', 'bold').setFontSize(15).setTextColor(...NAVY);
+        ensureSpace(46);
+        y += 12;
+        doc.setFont('helvetica', 'bold').setFontSize(15.5).setTextColor(...NAVY);
         doc.text(text, margin, y);
-        y += 6;
-        doc.setDrawColor(...GOLD).setLineWidth(1.5);
+        y += 7;
+        doc.setDrawColor(...GOLD).setLineWidth(1.8);
         doc.line(margin, y, pageW - margin, y);
-        y += 14;
+        y += 16;
       }
 
       function renderH3(text) {
         ensureSpace(28);
-        y += 4;
+        y += 6;
         doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...RUBY);
         doc.text(text, margin, y);
         y += 14;
@@ -1471,9 +1476,9 @@
         for (const line of lines) {
           ensureSpace(14);
           doc.text(line, margin, y);
-          y += 13;
+          y += 13.5;
         }
-        y += 4;
+        y += 6;
       }
 
       function renderList(items, ordered) {
@@ -1486,16 +1491,43 @@
             ensureSpace(14);
             if (i === 0) doc.text(bullet, margin, y);
             doc.text(lines[i], margin + 16, y);
-            y += 13;
+            y += 13.5;
           }
+          y += 1;
         });
-        y += 4;
+        y += 5;
       }
+
+      // Coverage / status patterns for row highlighting in image-coverage tables
+      const COVERAGE_GREEN = [217, 240, 219];   // 100% / ✓ — sage
+      const COVERAGE_RED   = [253, 226, 226];   // 0% / ✗   — blush
+      const COVERAGE_GREEN_TEXT = [21, 87, 36];
+      const COVERAGE_RED_TEXT   = [114, 28, 36];
 
       function renderTable(header, rows) {
         const cleanedHeader = header.map(h => stripInlineMd(h));
         const cleanedRows = rows.map(r => r.map(c => stripInlineMd(c)));
-        doc.autoTable({
+
+        // Detect the image-coverage table so we can apply green/red row tints.
+        const headerLower = cleanedHeader.map(h => h.toLowerCase().trim());
+        const coverageIdx = headerLower.findIndex(h => h === 'coverage');
+        const isCoverageTable = coverageIdx >= 0;
+
+        // Detect per-column widths for the common audit tables so the
+        // "Why" / "Prompt" / "Notes" column gets the room it needs.
+        const columnStyles = {};
+        cleanedHeader.forEach((h, idx) => {
+          const lower = h.toLowerCase().trim();
+          if (lower === 'items' || lower === 'images' || lower === 'count') {
+            columnStyles[idx] = { cellWidth: 56, halign: 'right' };
+          } else if (lower === 'coverage') {
+            columnStyles[idx] = { cellWidth: 72, halign: 'center', fontStyle: 'bold' };
+          } else if (lower === 'type') {
+            columnStyles[idx] = { cellWidth: 90 };
+          }
+        });
+
+        const config = {
           startY: y,
           head: [cleanedHeader],
           body: cleanedRows,
@@ -1505,7 +1537,7 @@
             font: 'helvetica',
             fontSize: 9.5,
             textColor: TEXT,
-            cellPadding: 5,
+            cellPadding: { top: 6, right: 7, bottom: 6, left: 7 },
             overflow: 'linebreak',
             valign: 'top',
             lineColor: BORDER,
@@ -1516,11 +1548,42 @@
             textColor: [255, 255, 255],
             fontStyle: 'bold',
             fontSize: 9.5,
+            cellPadding: { top: 8, right: 7, bottom: 8, left: 7 },
+            halign: 'left',
           },
           alternateRowStyles: { fillColor: ZEBRA },
+          columnStyles,
           theme: 'grid',
-        });
-        y = doc.lastAutoTable.finalY + 10;
+          pageBreak: 'auto',
+          rowPageBreak: 'avoid',
+        };
+
+        if (isCoverageTable) {
+          config.didParseCell = (data) => {
+            if (data.section !== 'body') return;
+            const cells = data.row.cells;
+            const cell = cells[coverageIdx];
+            if (!cell) return;
+            const txt = (Array.isArray(cell.text) ? cell.text.join(' ') : cell.text) || '';
+            // 100% / ✓ → green; 0% / ✗ → red. Be careful about partial matches like "10%".
+            if (/(?:^|[^\d])100\s*%/.test(txt) || /✓/.test(txt)) {
+              data.cell.styles.fillColor = COVERAGE_GREEN;
+              if (data.column.index === coverageIdx) {
+                data.cell.styles.textColor = COVERAGE_GREEN_TEXT;
+                data.cell.styles.fontStyle = 'bold';
+              }
+            } else if (/(?:^|[^\d])0\s*%(?:$|[^\d.])/.test(txt) || /✗/.test(txt)) {
+              data.cell.styles.fillColor = COVERAGE_RED;
+              if (data.column.index === coverageIdx) {
+                data.cell.styles.textColor = COVERAGE_RED_TEXT;
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          };
+        }
+
+        doc.autoTable(config);
+        y = doc.lastAutoTable.finalY + 14;
       }
 
       // Parse markdown and render token-by-token
