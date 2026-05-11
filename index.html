@@ -382,6 +382,12 @@
       border-color: rgba(249,168,212,0.45);
       color: var(--pink);
     }
+    .btn-beautify {
+      background: linear-gradient(135deg, #a78bfa 0%, #f9a8d4 55%, #fdba74 100%);
+      color: #0b0d18; border: none;
+      box-shadow: 0 6px 28px rgba(249,168,212,0.40);
+    }
+    .btn-beautify:hover { box-shadow: 0 8px 36px rgba(249,168,212,0.55); }
     .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
 
     .hint {
@@ -834,7 +840,11 @@
       </section>
 
       <div class="bottom-actions" id="bottom-actions" style="display:none">
-        <button class="btn btn-primary" id="download-btn" onclick="downloadPDF()">
+        <button class="btn btn-beautify" id="beautify-btn" onclick="downloadPDF('beautify')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M4.5 4.5l2 2M17.5 17.5l2 2M4.5 19.5l2-2M17.5 6.5l2-2"/><circle cx="12" cy="12" r="4"/></svg>
+          Beautify PDF
+        </button>
+        <button class="btn btn-primary" id="download-btn" onclick="downloadPDF('standard')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
           Download PDF
         </button>
@@ -1455,11 +1465,16 @@
              menu.restaurant?.name || menu.store?.name || null;
     }
 
-    async function downloadPDF() {
-      const btn = document.getElementById('download-btn');
+    async function downloadPDF(style) {
+      style = (style === 'beautify') ? 'beautify' : 'standard';
+      const btnId = style === 'beautify' ? 'beautify-btn' : 'download-btn';
+      const btn = document.getElementById(btnId);
+      const otherBtn = document.getElementById(style === 'beautify' ? 'download-btn' : 'beautify-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Generating PDF…';
+      if (otherBtn) otherBtn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> ' +
+        (style === 'beautify' ? 'Beautifying…' : 'Generating PDF…');
 
       const restaurantName =
         guessRestaurantName(currentMenu) ||
@@ -1480,6 +1495,7 @@
             location,
             dateStr,
             reportsCount: supportingReports.length,
+            style,
           }),
         });
 
@@ -1494,17 +1510,19 @@
         a.href = url;
         const stamp = new Date().toISOString().slice(0, 10);
         const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
-        a.download = safeName + '_Menu_Audit_' + stamp + '.pdf';
+        const suffix = style === 'beautify' ? '_Visual' : '';
+        a.download = safeName + '_Menu_Audit' + suffix + '_' + stamp + '.pdf';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-        setStatus('ok', 'PDF downloaded.');
+        setStatus('ok', style === 'beautify' ? 'Visual PDF downloaded.' : 'PDF downloaded.');
       } catch (e) {
         setStatus('error', 'PDF generation failed: ' + e.message);
       } finally {
         btn.disabled = false;
+        if (otherBtn) otherBtn.disabled = false;
         btn.innerHTML = originalLabel;
       }
     }

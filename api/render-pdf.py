@@ -13,8 +13,14 @@ Body: {
   location:        string  (optional)
   dateStr:         string  (optional, defaults to today)
   reportsCount:    number  (optional, defaults to 0)
+  style:           string  (optional, "standard" or "beautify"; default "standard")
 }
 Returns: application/pdf binary, with Content-Disposition: attachment
+
+Style "beautify" turns Section 1 (Headline Counts) into a coloured tile
+grid, adds a horizontal bar chart visualisation under Section 2 (Image
+Coverage), and wraps bold standalone statements in callout boxes. The
+underlying Markdown content is unchanged — same audit, richer layout.
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -45,6 +51,22 @@ GREEN_TEXT = colors.HexColor('#155724')
 RED_BG     = colors.HexColor('#fde2e2')
 RED_TEXT   = colors.HexColor('#721c24')
 
+# ----- Beautify-mode palette ---------------------------------------------------
+TILE_COLORS = [
+    colors.HexColor('#5046e5'),  # indigo
+    colors.HexColor('#7c3aed'),  # violet
+    colors.HexColor('#0891b2'),  # cyan
+    colors.HexColor('#059669'),  # emerald
+    colors.HexColor('#d97706'),  # amber
+    colors.HexColor('#e11d48'),  # rose
+    colors.HexColor('#0284c7'),  # sky
+]
+BAR_GREEN  = colors.HexColor('#059669')
+BAR_AMBER  = colors.HexColor('#d97706')
+BAR_RED    = colors.HexColor('#e11d48')
+BAR_TRACK  = colors.HexColor('#f3eee2')
+CALLOUT_BG = colors.HexColor('#fef7f1')
+
 
 # ----- Custom flowables --------------------------------------------------------
 class GoldRule(Flowable):
@@ -61,6 +83,199 @@ class GoldRule(Flowable):
         self.canv.setStrokeColor(self.color)
         self.canv.setLineWidth(self.line_width)
         self.canv.line(0, 0, self.width, 0)
+
+
+class MetricTileGrid(Flowable):
+    """A grid of coloured metric tiles. Used in beautify mode to replace or
+    augment the Headline Counts table."""
+
+    def __init__(self, metrics, width, n_cols=3):
+        Flowable.__init__(self)
+        self.metrics = metrics       # list of (label, value) tuples
+        self.width = width
+        self.n_cols = n_cols
+        self.tile_w = (width - (n_cols - 1) * 8) / n_cols
+        self.tile_h = 62
+        n_rows = (len(metrics) + n_cols - 1) // n_cols
+        self.height = n_rows * (self.tile_h + 8) - 8 if n_rows else 0
+
+    def wrap(self, *_args):
+        return (self.width, self.height)
+
+    def draw(self):
+        c = self.canv
+        for idx, (label, value) in enumerate(self.metrics):
+            row = idx // self.n_cols
+            col = idx % self.n_cols
+            x = col * (self.tile_w + 8)
+            y = self.height - (row + 1) * self.tile_h - row * 8
+
+            color = TILE_COLORS[idx % len(TILE_COLORS)]
+            c.setFillColor(color)
+            c.roundRect(x, y, self.tile_w, self.tile_h, 7, fill=1, stroke=0)
+
+            # Label (small, uppercase, white-on-color)
+            c.setFillColor(colors.white)
+            c.setFont('Helvetica-Bold', 7.5)
+            label_clean = label.upper()
+            # truncate gracefully if too wide
+            max_label_chars = max(8, int(self.tile_w / 4.2))
+            if len(label_clean) > max_label_chars:
+                label_clean = label_clean[:max_label_chars - 1] + '…'
+            c.drawString(x + 11, y + self.tile_h - 17, label_clean)
+
+            # Value (big bold)
+            c.setFont('Helvetica-Bold', 18)
+            value_str = str(value)
+            if len(value_str) > 22:
+                value_str = value_str[:21] + '…'
+            c.drawString(x + 11, y + 14, value_str)
+
+
+class CoverageBarChart(Flowable):
+    """A horizontal bar chart for the Image Coverage by Category section.
+    Bars are coloured green (≥75%), amber (25–74%), red (<25%)."""
+
+    BAR_H = 13
+    GAP   = 5
+    LABEL_W = 150
+    VALUE_W = 42
+
+    def __init__(self, items, width):
+        Flowable.__init__(self)
+        self.items = items  # list of (category, coverage_pct_int)
+        self.width = width
+        self.height = (self.BAR_H + self.GAP) * len(items) + 16 if items else 0
+
+    def wrap(self, *_args):
+        return (self.width, self.height)
+
+    def draw(self):
+        if not self.items:
+            return
+        c = self.canv
+        bar_max_w = self.width - self.LABEL_W - self.VALUE_W
+        y = self.height - 12
+
+        for cat, cov in self.items:
+            cov_clamped = max(0, min(100, int(cov)))
+
+            # Category label
+            c.setFillColor(TEXT)
+            c.setFont('Helvetica', 8.5)
+            label = cat if len(cat) <= 24 else cat[:23] + '…'
+            c.drawString(0, y - self.BAR_H + 3, label)
+
+            # Track
+            c.setFillColor(BAR_TRACK)
+            c.roundRect(self.LABEL_W, y - self.BAR_H, bar_max_w, self.BAR_H, 2.5, fill=1, stroke=0)
+
+            # Filled bar
+            fill_w = max(2, cov_clamped / 100.0 * bar_max_w)
+            if cov_clamped >= 75:
+                bar_color = BAR_GREEN
+            elif cov_clamped >= 25:
+                bar_color = BAR_AMBER
+            else:
+                bar_color = BAR_RED
+            c.setFillColor(bar_color)
+            c.roundRect(self.LABEL_W, y - self.BAR_H, fill_w, self.BAR_H, 2.5, fill=1, stroke=0)
+
+            # Coverage % label, bold, same colour as bar
+            c.setFillColor(bar_color)
+            c.setFont('Helvetica-Bold', 8.5)
+            c.drawString(self.LABEL_W + bar_max_w + 6, y - self.BAR_H + 3, f'{cov_clamped}%')
+
+            y -= self.BAR_H + self.GAP
+
+
+class Callout(Flowable):
+    """A coloured callout box used to highlight bold standalone statements
+    (the §3 upsells conclusion, §9 net summary key line, etc.)."""
+
+    PADDING = 12
+    LEFT_BAR_W = 4
+    INNER_GAP = 6
+
+    def __init__(self, text, width, accent=RUBY, bg=CALLOUT_BG, font_size=11):
+        Flowable.__init__(self)
+        self.text = text
+        self.width = width
+        self.accent = accent
+        self.bg = bg
+        # Lay out paragraph once so we know our height
+        style = ParagraphStyle(
+            'callout',
+            fontName='Helvetica-Bold',
+            fontSize=font_size,
+            leading=font_size + 4,
+            textColor=TEXT,
+        )
+        self._para = Paragraph(text, style)
+        inner_w = width - 2 * self.PADDING - self.LEFT_BAR_W - self.INNER_GAP
+        _, ph = self._para.wrap(inner_w, 1000)
+        self._para_h = ph
+        self.height = ph + 2 * self.PADDING
+
+    def wrap(self, *_args):
+        return (self.width, self.height)
+
+    def draw(self):
+        c = self.canv
+        # Background
+        c.setFillColor(self.bg)
+        c.roundRect(0, 0, self.width, self.height, 5, fill=1, stroke=0)
+        # Left accent bar
+        c.setFillColor(self.accent)
+        c.rect(0, 0, self.LEFT_BAR_W, self.height, fill=1, stroke=0)
+        # Paragraph
+        self._para.drawOn(
+            c,
+            self.PADDING + self.LEFT_BAR_W + self.INNER_GAP,
+            self.PADDING,
+        )
+
+
+# ----- Beautify helpers — extract structured data from Markdown tables --------
+def _extract_metric_tiles(table_lines):
+    """Parse a 'Metric | Count' table into (label, short_value) tuples for tiles."""
+    pairs = []
+    if len(table_lines) < 3:
+        return pairs
+    for line in table_lines[2:]:
+        cells = _split_table_row(line)
+        if len(cells) < 2:
+            continue
+        label = re.sub(r'\*\*([^*]+)\*\*', r'\1', cells[0]).strip()
+        value_full = re.sub(r'\*\*([^*]+)\*\*', r'\1', cells[1]).strip()
+        # Pull the leading short form: "147 (137 enabled, 10 disabled)" → "147"
+        m = re.match(r'^\s*([0-9]+(?:[.,][0-9]+)?\s*(?:/\s*[0-9]+)?\s*%?)', value_full)
+        short = m.group(1).strip() if m else value_full[:18]
+        # Append coverage % parenthetical if present in the full text
+        pct_m = re.search(r'\((\d+(?:\.\d+)?\s*%)\)', value_full)
+        if pct_m and pct_m.group(1) not in short:
+            short = short + ' (' + pct_m.group(1) + ')'
+        pairs.append((label, short))
+    return pairs
+
+
+def _extract_coverage_pairs(table_lines):
+    """Parse an 'Image Coverage by Category' table into (category, pct) tuples."""
+    pairs = []
+    if len(table_lines) < 3:
+        return pairs
+    for line in table_lines[2:]:
+        cells = _split_table_row(line)
+        if len(cells) < 4:
+            continue
+        category = re.sub(r'\*\*([^*]+)\*\*', r'\1', cells[0]).strip()
+        cov_cell = cells[-1].strip()
+        m = re.search(r'(\d+(?:\.\d+)?)\s*%', cov_cell)
+        if not m:
+            continue
+        pct = int(round(float(m.group(1))))
+        pairs.append((category, pct))
+    return pairs
 
 
 # ----- Inline Markdown -> ReportLab paragraph mini-HTML ------------------------
@@ -338,7 +553,161 @@ def _parse_to_flowables(md, styles, content_w):
     return flowables
 
 
-def render_pdf(audit_md, restaurant_name='Menu', location='', date_str='', reports_count=0):
+def _parse_to_flowables_beautify(md, styles, content_w):
+    """Beautify variant of the parser. Same Markdown grammar, but:
+      - Section 1 (Headline Counts): renders a coloured MetricTileGrid above
+        the standard table.
+      - Section 2 (Image Coverage by Category): renders the standard table
+        followed by a CoverageBarChart visualisation.
+      - Any standalone **bold sentence** on its own line becomes a Callout box.
+    """
+    lines = md.splitlines()
+    flowables = []
+    current_section = None
+    i = 0
+
+    while i < len(lines):
+        raw = lines[i]
+        s = raw.strip()
+
+        if not s:
+            i += 1
+            continue
+
+        # Headings — track which section we're in for table-aware enhancements
+        if s.startswith('### '):
+            flowables.append(Paragraph(inline_md(s[4:].strip()), styles['h3']))
+            i += 1
+            continue
+        if s.startswith('## '):
+            heading_text = s[3:].strip()
+            sec_m = re.match(r'^(\d+)\.\s+(.+)$', heading_text)
+            current_section = int(sec_m.group(1)) if sec_m else None
+            heading_block = [
+                Paragraph(inline_md(heading_text), styles['h2']),
+                Spacer(1, 1),
+                GoldRule(content_w, 1.8, GOLD),
+                Spacer(1, 8),
+            ]
+            flowables.append(KeepTogether(heading_block))
+            i += 1
+            continue
+        if s.startswith('# '):
+            heading_text = s[2:].strip()
+            heading_block = [
+                Paragraph(inline_md(heading_text), styles['h2']),
+                Spacer(1, 1),
+                GoldRule(content_w, 1.8, GOLD),
+                Spacer(1, 8),
+            ]
+            flowables.append(KeepTogether(heading_block))
+            i += 1
+            continue
+
+        # Tables — pipe-prefixed followed by separator
+        if s.startswith('|') and i + 1 < len(lines) and _RE_TABLE_SEP.match(lines[i + 1]):
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                table_lines.append(lines[i])
+                i += 1
+
+            # Section 1: prepend a metric-tile grid built from the table
+            if current_section == 1:
+                tiles = _extract_metric_tiles(table_lines)
+                if tiles:
+                    flowables.append(MetricTileGrid(tiles, content_w))
+                    flowables.append(Spacer(1, 12))
+
+            t = _build_table(table_lines, content_w, styles)
+            if t is not None:
+                flowables.append(t)
+                flowables.append(Spacer(1, 8))
+
+            # Section 2: append a horizontal bar chart visualisation
+            if current_section == 2:
+                pairs = _extract_coverage_pairs(table_lines)
+                if pairs:
+                    flowables.append(Spacer(1, 4))
+                    flowables.append(CoverageBarChart(pairs, content_w))
+                    flowables.append(Spacer(1, 10))
+
+            continue
+
+        # Bullet list
+        m = _RE_BULLET.match(s)
+        if m:
+            while i < len(lines) and _RE_BULLET.match(lines[i].strip()):
+                item = _RE_BULLET.match(lines[i].strip()).group(1)
+                cont = []
+                j = i + 1
+                while j < len(lines):
+                    nxt = lines[j]
+                    if not nxt.strip():
+                        break
+                    if _is_block_start(nxt):
+                        break
+                    cont.append(nxt.strip())
+                    j += 1
+                if cont:
+                    item = item + ' ' + ' '.join(cont)
+                flowables.append(Paragraph('• ' + inline_md(item), styles['list']))
+                i = j
+            flowables.append(Spacer(1, 4))
+            continue
+
+        # Numbered list
+        m = _RE_NUMBERED.match(s)
+        if m:
+            n = 0
+            while i < len(lines) and _RE_NUMBERED.match(lines[i].strip()):
+                mm = _RE_NUMBERED.match(lines[i].strip())
+                n += 1
+                item = mm.group(2)
+                cont = []
+                j = i + 1
+                while j < len(lines):
+                    nxt = lines[j]
+                    if not nxt.strip():
+                        break
+                    if _is_block_start(nxt):
+                        break
+                    cont.append(nxt.strip())
+                    j += 1
+                if cont:
+                    item = item + ' ' + ' '.join(cont)
+                flowables.append(Paragraph(f'{n}. ' + inline_md(item), styles['list']))
+                i = j
+            flowables.append(Spacer(1, 4))
+            continue
+
+        # End-of-audit marker
+        if s.strip().strip('*').strip('—').strip().lower() == 'end of audit':
+            flowables.append(Paragraph('— End of audit —', styles['end']))
+            i += 1
+            continue
+
+        # Standalone bold statement → Callout box.
+        # Must be the whole line: **…** with optional trailing punctuation.
+        callout_m = re.match(r'^\*\*([^*]{6,200})\*\*[\.!?]?$', s)
+        if callout_m and len(s) > 12:
+            flowables.append(Spacer(1, 4))
+            flowables.append(Callout(inline_md(callout_m.group(1)), content_w))
+            flowables.append(Spacer(1, 8))
+            i += 1
+            continue
+
+        # Regular paragraph — accumulate consecutive non-blank, non-block lines
+        para = [s]
+        i += 1
+        while i < len(lines) and lines[i].strip() and not _is_block_start(lines[i]):
+            para.append(lines[i].strip())
+            i += 1
+        flowables.append(Paragraph(inline_md(' '.join(para)), styles['body']))
+
+    return flowables
+
+
+def render_pdf(audit_md, restaurant_name='Menu', location='', date_str='', reports_count=0, style='standard'):
     buf = BytesIO()
     page_w = A4[0]
     margin = 56
@@ -374,7 +743,12 @@ def render_pdf(audit_md, restaurant_name='Menu', location='', date_str='', repor
     story.append(GoldRule(content_w, 2.0, GOLD))
     story.append(Spacer(1, 14))
 
-    story.extend(_parse_to_flowables(audit_md, styles, content_w))
+    if style == 'beautify':
+        story.append(Paragraph('Visual edition', styles['meta']))
+        story.append(Spacer(1, 6))
+        story.extend(_parse_to_flowables_beautify(audit_md, styles, content_w))
+    else:
+        story.extend(_parse_to_flowables(audit_md, styles, content_w))
 
     def _draw_footer(canv, _doc):
         canv.saveState()
@@ -406,6 +780,9 @@ class handler(BaseHTTPRequestHandler):
         restaurant_name = (data.get('restaurantName') or 'Menu').strip() or 'Menu'
         location        = (data.get('location') or '').strip()
         date_str        = (data.get('dateStr') or '').strip() or datetime.now().strftime('%B %d, %Y')
+        style           = (data.get('style') or 'standard').strip().lower()
+        if style not in ('standard', 'beautify'):
+            style = 'standard'
         try:
             reports_count = int(data.get('reportsCount') or 0)
         except (TypeError, ValueError):
@@ -418,13 +795,15 @@ class handler(BaseHTTPRequestHandler):
                 location=location,
                 date_str=date_str,
                 reports_count=reports_count,
+                style=style,
             )
         except Exception as e:
             return self._json_error(500, f'PDF generation failed: {e}')
 
         safe_name = re.sub(r'[^A-Za-z0-9_-]+', '_', restaurant_name).strip('_') or 'Menu'
         stamp = datetime.now().strftime('%Y-%m-%d')
-        filename = f'{safe_name}_Menu_Audit_{stamp}.pdf'
+        suffix = '_Visual' if style == 'beautify' else ''
+        filename = f'{safe_name}_Menu_Audit{suffix}_{stamp}.pdf'
 
         self.send_response(200)
         self.send_header('Content-Type', 'application/pdf')
