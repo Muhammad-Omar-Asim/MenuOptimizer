@@ -775,6 +775,17 @@
       </div>
 
       <div class="field-block">
+        <label class="toggle-row" for="enable-thinking">
+          <input type="checkbox" id="enable-thinking" checked />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-title">Extended thinking (recommended)</span>
+            <span class="toggle-desc">Claude reasons through the analysis before writing — improves quality and specificity of recommendations. Adds about 10–30 seconds, during which no text appears on screen yet.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="field-block">
         <label class="toggle-row" for="enable-review">
           <input type="checkbox" id="enable-review" checked />
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -905,11 +916,13 @@
       document.getElementById('prompt-stats').textContent = '';
 
       const location = (document.getElementById('location-input')?.value || '').trim();
+      const useExtendedThinking = document.getElementById('enable-thinking')?.checked !== false;
       const body = {
         menu: currentMenu || undefined,
         location: location || undefined,
         supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
         firstPassAudit: lastAnalysisText || undefined,
+        useExtendedThinking,
       };
 
       try {
@@ -929,6 +942,11 @@
         const stats = [];
         stats.push('model: ' + (data.model || '—'));
         stats.push('max_tokens: ' + (data.max_tokens || '—'));
+        if (typeof data.extended_thinking === 'boolean') {
+          stats.push('thinking: ' + (data.extended_thinking
+            ? 'on (' + (data.thinking_budget_tokens || 0) + 'tk)'
+            : 'off'));
+        }
         if (data.slim_stats) {
           stats.push('menu: ' + Math.round(data.slim_stats.original_chars / 1000) + 'KB → ' +
                      Math.round(data.slim_stats.slimmed_chars / 1000) + 'KB (' +
@@ -1220,12 +1238,14 @@
       lastAnalysisText = ''; lastAnalysisHtml = ''; lastMetrics = null;
 
       const location = (document.getElementById('location-input').value || '').trim();
+      const useExtendedThinking = document.getElementById('enable-thinking').checked;
 
       try {
         const firstPass = await streamAudit('/api/analyze', {
           menu: currentMenu,
           location: location || undefined,
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+          useExtendedThinking,
         });
         if (!firstPass) { resetBtn(); return; }
 
@@ -1265,6 +1285,7 @@
           location: location || undefined,
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           firstPassAudit: lastAnalysisText,
+          useExtendedThinking,
         }, { isReview: true });
 
         if (reviewed) {

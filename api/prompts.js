@@ -47,9 +47,15 @@ export default async function handler(req) {
 
   const reviewPrompt = buildReviewPrompt({ firstPassAudit, location, reports });
 
+  // Reflect the thinking setting back so the modal stats can show on/off
+  // and the correct max_tokens / thinking budget.
+  const useExtendedThinking = body?.useExtendedThinking !== false;
+
   return json({
     model: 'claude-sonnet-4-5-20250929',
-    max_tokens: 16000,
+    max_tokens: useExtendedThinking ? 24000 : 16000,
+    extended_thinking: useExtendedThinking,
+    thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
     location,
     reports_count: reports.length,
     slim_stats: slimStats,

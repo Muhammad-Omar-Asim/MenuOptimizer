@@ -53,6 +53,19 @@ export default async function handler(req) {
 
   const prompt = buildAnalyzePrompt({ menuJson, location, reports });
 
+  // Extended thinking — defaults to true; client passes false to opt out.
+  const useExtendedThinking = body?.useExtendedThinking !== false;
+
+  const payload = {
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: useExtendedThinking ? 24000 : 16000,
+    stream: true,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  if (useExtendedThinking) {
+    payload.thinking = { type: 'enabled', budget_tokens: 8000 };
+  }
+
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -60,12 +73,7 @@ export default async function handler(req) {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 16000,
-      stream: true,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!upstream.ok) {
