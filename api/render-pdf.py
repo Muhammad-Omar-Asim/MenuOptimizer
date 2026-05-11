@@ -132,6 +132,39 @@ class MetricTileGrid(Flowable):
             c.drawString(x + 11, y + 14, value_str)
 
 
+class SectionBanner(Flowable):
+    """Full-width filled coloured banner used as a section heading in beautify
+    mode. Replaces the standard navy-text + gold-rule treatment so the visual
+    identity is obvious even when no other beautify enhancements trigger."""
+
+    HEIGHT = 32
+    PADDING_X = 14
+
+    def __init__(self, text, width, color):
+        Flowable.__init__(self)
+        self.text = text
+        self.width = width
+        self.color = color
+        self.height = self.HEIGHT
+
+    def wrap(self, *_args):
+        return (self.width, self.height)
+
+    def draw(self):
+        c = self.canv
+        # Filled coloured rectangle
+        c.setFillColor(self.color)
+        c.roundRect(0, 0, self.width, self.height, 5, fill=1, stroke=0)
+        # Heading text in white
+        c.setFillColor(colors.white)
+        c.setFont('Helvetica-Bold', 13)
+        label = self.text
+        # Defensive truncation if absurdly long
+        if len(label) > 90:
+            label = label[:88] + '…'
+        c.drawString(self.PADDING_X, 10, label)
+
+
 class CoverageBarChart(Flowable):
     """A horizontal bar chart for the Image Coverage by Category section.
     Bars are coloured green (≥75%), amber (25–74%), red (<25%)."""
@@ -579,26 +612,21 @@ def _parse_to_flowables_beautify(md, styles, content_w):
             flowables.append(Paragraph(inline_md(s[4:].strip()), styles['h3']))
             i += 1
             continue
-        if s.startswith('## '):
-            heading_text = s[3:].strip()
-            sec_m = re.match(r'^(\d+)\.\s+(.+)$', heading_text)
-            current_section = int(sec_m.group(1)) if sec_m else None
+        if s.startswith('## ') or s.startswith('# '):
+            heading_text = s[3:].strip() if s.startswith('## ') else s[2:].strip()
+            # Looser section detection — accept "1.", "1)", "1:", or just "1 " before the name
+            sec_m = re.match(r'^(\d+)\s*[.):\s]\s*(.+)$', heading_text)
+            if sec_m:
+                current_section = int(sec_m.group(1))
+                banner_color = TILE_COLORS[(current_section - 1) % len(TILE_COLORS)]
+            else:
+                current_section = None
+                # Use a stable colour for unnumbered headings (e.g. "## Net Summary")
+                banner_color = NAVY
             heading_block = [
-                Paragraph(inline_md(heading_text), styles['h2']),
-                Spacer(1, 1),
-                GoldRule(content_w, 1.8, GOLD),
                 Spacer(1, 8),
-            ]
-            flowables.append(KeepTogether(heading_block))
-            i += 1
-            continue
-        if s.startswith('# '):
-            heading_text = s[2:].strip()
-            heading_block = [
-                Paragraph(inline_md(heading_text), styles['h2']),
-                Spacer(1, 1),
-                GoldRule(content_w, 1.8, GOLD),
-                Spacer(1, 8),
+                SectionBanner(heading_text, content_w, banner_color),
+                Spacer(1, 10),
             ]
             flowables.append(KeepTogether(heading_block))
             i += 1
@@ -758,7 +786,21 @@ def render_pdf(audit_md, restaurant_name='Menu', location='', date_str='', repor
         canv.drawRightString(page_w - margin, 26, f'Page {canv.getPageNumber()}')
         canv.restoreState()
 
-    doc.build(story, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
+    def _draw_beautify_chrome(canv, _doc):
+        canv.saveState()
+        # Violet accent band across the top — visible page chrome that signals
+        # beautify mode regardless of section-detection results.
+        canv.setFillColor(colors.HexColor('#7c3aed'))
+        canv.rect(0, A4[1] - 6, page_w, 6, fill=1, stroke=0)
+        # Footer
+        canv.setFont('Helvetica-Oblique', 8.5)
+        canv.setFillColor(MUTED)
+        canv.drawString(margin, 26, f'{restaurant_name} · Menu JSON Audit · Visual Edition')
+        canv.drawRightString(page_w - margin, 26, f'Page {canv.getPageNumber()}')
+        canv.restoreState()
+
+    chrome = _draw_beautify_chrome if style == 'beautify' else _draw_footer
+    doc.build(story, onFirstPage=chrome, onLaterPages=chrome)
     buf.seek(0)
     return buf.read()
 
