@@ -1135,6 +1135,65 @@
     }
     function escapeAttr(s) { return escapeHtml(s); }
 
+    // ----- First-pass output sanity check ---------------------------------
+    // Looks for the patterns that have produced broken PDFs on past runs:
+    //   - missing required section heading
+    //   - tables emitted as inline-pipe streams (no newlines between rows)
+    //   - menu metadata leaking into a stray document title
+    //   - section heading swallowed into the previous table's last cell
+    // Returns an array of issue strings; empty means clean.
+    function validateFirstPassOutput(text, hasLocation) {
+      const issues = [];
+      if (!text || text.length < 200) {
+        issues.push('output is suspiciously short (' + (text ? text.length : 0) + ' chars)');
+        return issues;
+      }
+
+      const requiredHeadings = [
+        { re: /^##\s+1\.\s+Headline Counts\b/m,                  name: '## 1. Headline Counts' },
+        { re: /^###\s+Food vs Drink split\b/m,                   name: '### Food vs Drink split' },
+        { re: /^##\s+2\.\s+Image Coverage by Category\b/m,       name: '## 2. Image Coverage by Category' },
+        { re: /^##\s+3\.\s+The "?Upsells"? Finding/m,            name: '## 3. The "Upsells" Finding' },
+        { re: /^##\s+4\.\s+Items in the Wrong Category\b/m,      name: '## 4. Items in the Wrong Category' },
+        { re: /^##\s+5\.\s+Other Data-Quality Issues\b/m,        name: '## 5. Other Data-Quality Issues' },
+        { re: /^##\s+Recommendations to Make the Menu More Navigable\b/m, name: '## Recommendations …' },
+        { re: /^##\s+Net Summary\b/m,                            name: '## Net Summary' },
+      ];
+      if (hasLocation) {
+        requiredHeadings.push({
+          re: /^##\s+6\.\s+Revenue (?:&|and) Competitive Strategy\b/m,
+          name: '## 6. Revenue & Competitive Strategy',
+        });
+      }
+      for (const { re, name } of requiredHeadings) {
+        if (!re.test(text)) issues.push('missing heading: ' + name);
+      }
+
+      // Detect inline-pipe tables — a line with an unusually high pipe count
+      // is almost certainly multiple rows concatenated.
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const pipes = (line.match(/\|/g) || []).length;
+        if (pipes >= 14) {
+          issues.push('inline-pipe table on one line (' + pipes + ' pipes)');
+          break;
+        }
+      }
+
+      // Detect a stray pre-section-1 title containing menu metadata
+      const beforeSection1 = text.split(/^##\s+1\.\s+Headline Counts\b/m)[0] || '';
+      if (/\bRevision\b|\bPublished\b|\bDraft\b|\bActive\b/i.test(beforeSection1)) {
+        issues.push('menu-metadata leakage in pre-section title');
+      }
+
+      // Heading swallowed into the previous table's last cell
+      if (/\|[^|\n]*Food vs Drink split[^|\n]*\|/m.test(text)) {
+        issues.push('"Food vs Drink split" sub-heading swallowed into a table cell');
+      }
+
+      return issues;
+    }
+
     function stripMetricMarkers(s) {
       // Robust strip: handles missing >>> closer, extra whitespace, multiple blocks
       return s
@@ -1172,8 +1231,15 @@
         if (!firstPass) { resetBtn(); return; }
 
         const enableReview = document.getElementById('enable-review').checked;
-        if (!enableReview) {
-          // Single-pass mode — skip the confirmatory check.
+        const validationIssues = validateFirstPassOutput(lastAnalysisText, !!location);
+        const autoEscalate = !enableReview && validationIssues.length > 0;
+
+        if (autoEscalate) {
+          console.warn('First-pass validation failed:', validationIssues);
+        }
+
+        if (!enableReview && !autoEscalate) {
+          // Single-pass mode — output is structurally sound, skip review.
           document.getElementById('bottom-actions').style.display = 'flex';
           setStatus('ok', 'Audit complete (first pass only — confirmatory check skipped).');
           resetBtn();
@@ -1186,7 +1252,15 @@
         const bannerText = document.getElementById('review-status-text');
         banner.style.display = 'flex';
         banner.classList.remove('done');
-        bannerText.textContent = 'Reviewing first-pass audit against the gold-standard sample…';
+        if (autoEscalate) {
+          bannerText.textContent =
+            'First pass had structural issues (' + validationIssues.length +
+            ' detected: ' + validationIssues.slice(0, 2).join('; ') +
+            (validationIssues.length > 2 ? '; …' : '') +
+            ') — auto-running confirmatory check to repair.';
+        } else {
+          bannerText.textContent = 'Reviewing first-pass audit against the gold-standard sample…';
+        }
 
         const reviewed = await streamAudit('/api/review', {
           location: location || undefined,
