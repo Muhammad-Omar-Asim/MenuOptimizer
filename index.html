@@ -1150,21 +1150,20 @@
       }
 
       const requiredHeadings = [
-        { re: /^##\s+1\.\s+Headline Counts\b/m,                  name: '## 1. Headline Counts' },
-        { re: /^###\s+Food vs Drink split\b/m,                   name: '### Food vs Drink split' },
-        { re: /^##\s+2\.\s+Image Coverage by Category\b/m,       name: '## 2. Image Coverage by Category' },
-        { re: /^##\s+3\.\s+The "?Upsells"? Finding/m,            name: '## 3. The "Upsells" Finding' },
-        { re: /^##\s+4\.\s+Items in the Wrong Category\b/m,      name: '## 4. Items in the Wrong Category' },
-        { re: /^##\s+5\.\s+Other Data-Quality Issues\b/m,        name: '## 5. Other Data-Quality Issues' },
-        { re: /^##\s+Recommendations to Make the Menu More Navigable\b/m, name: '## Recommendations …' },
-        { re: /^##\s+Net Summary\b/m,                            name: '## Net Summary' },
+        { re: /^##\s+1\.\s+Headline Counts\b/m,                                    name: '## 1. Headline Counts' },
+        { re: /^###\s+Food vs Drink split\b/m,                                     name: '### Food vs Drink split' },
+        { re: /^##\s+2\.\s+Image Coverage by Category\b/m,                         name: '## 2. Image Coverage by Category' },
+        { re: /^##\s+3\.\s+The "?Upsells"? Finding/m,                              name: '## 3. The Upsells Finding' },
+        { re: /^##\s+4\.\s+Items in the Wrong Category\b/m,                        name: '## 4. Items in the Wrong Category' },
+        { re: /^##\s+5\.\s+Other Data-Quality Issues\b/m,                          name: '## 5. Other Data-Quality Issues' },
+        { re: /^##\s+6\.\s+Consumer Behaviour (?:&|and) Catchment Analysis\b/m,    name: '## 6. Consumer Behaviour & Catchment Analysis' },
+        { re: /^##\s+7\.\s+Competitive Strategy\b/m,                               name: '## 7. Competitive Strategy' },
+        { re: /^##\s+8\.\s+Recommendations to Make the Menu More Navigable\b/m,    name: '## 8. Recommendations to Make the Menu More Navigable' },
+        { re: /^##\s+9\.\s+Net Summary\b/m,                                        name: '## 9. Net Summary' },
       ];
-      if (hasLocation) {
-        requiredHeadings.push({
-          re: /^##\s+6\.\s+Revenue (?:&|and) Competitive Strategy\b/m,
-          name: '## 6. Revenue & Competitive Strategy',
-        });
-      }
+      // hasLocation no longer toggles a section — the new analyze prompt
+      // makes Competitive Strategy a required section regardless.
+      void hasLocation;
       for (const { re, name } of requiredHeadings) {
         if (!re.test(text)) issues.push('missing heading: ' + name);
       }
