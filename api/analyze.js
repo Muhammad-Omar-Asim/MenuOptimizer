@@ -45,7 +45,12 @@ export default async function handler(req) {
   const reports = Array.isArray(body?.supportingReports) ? body.supportingReports : [];
 
   const slim = slimMenu(menu);
-  const menuJson = JSON.stringify(slim);
+  // Pretty-print with 2-space indentation. Costs ~30-50% more tokens than
+  // minified but is meaningfully easier for the model to scan — categories
+  // and items have predictable line-based boundaries, modifiers nest
+  // visibly, etc. This matches the shape a user would get when pasting the
+  // JSON into claude.ai (where files are presented as readable text).
+  const menuJson = JSON.stringify(slim, null, 2);
 
   if (menuJson.length > MAX_MENU_CHARS) {
     return new Response(JSON.stringify({
@@ -64,22 +69,22 @@ export default async function handler(req) {
   // Extended thinking — defaults to true; client passes false to opt out.
   const useExtendedThinking = body?.useExtendedThinking !== false;
 
-  // Web search is enabled by default on analyze. Set DISABLE_WEB_SEARCH=true
-  // in Vercel env vars to turn it off if the Anthropic account doesn't have
-  // the tool enabled (the request will 400 in that case).
-  const enableWebSearch = process.env.DISABLE_WEB_SEARCH !== 'true';
+  // Web search is now opt-in. Set ENABLE_WEB_SEARCH=true in Vercel env vars
+  // to turn it on. Default OFF so all of the output token budget is spent on
+  // JSON analysis rather than tool_use blocks.
+  const enableWebSearch = process.env.ENABLE_WEB_SEARCH === 'true';
 
-  // Token budget: extended thinking eats up to 8K, web-search tool_use blocks
-  // and their results also count toward output. Give the model breathing room.
+  // With web search off, give the model substantially more output budget for
+  // the analysis itself. Thinking takes ~8K when on; everything else is text.
   const maxTokens = useExtendedThinking
-    ? (enableWebSearch ? 32000 : 24000)
-    : (enableWebSearch ? 24000 : 16000);
+    ? (enableWebSearch ? 32000 : 40000)
+    : (enableWebSearch ? 24000 : 32000);
 
   const payload = {
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: maxTokens,
     stream: true,
-    system: buildSystemPrompt({ hasWebSearch: enableWebSearch }),
+    system: buildSystemPrompt(),
     messages: [{ role: 'user', content: prompt }],
   };
   if (useExtendedThinking) {

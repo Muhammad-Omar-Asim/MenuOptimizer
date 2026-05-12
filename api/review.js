@@ -48,7 +48,7 @@ export default async function handler(req) {
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: useExtendedThinking ? 24000 : 16000,
     stream: true,
-    system: buildSystemPrompt({ hasWebSearch: false }),
+    system: buildSystemPrompt(),
     messages: [{ role: 'user', content: prompt }],
   };
   if (useExtendedThinking) {

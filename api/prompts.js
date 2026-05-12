@@ -33,7 +33,8 @@ export default async function handler(req) {
 
   if (menu) {
     const slim = slimMenu(menu);
-    slimmedJson = JSON.stringify(slim);
+    // Pretty-print to match what /api/analyze actually sends to Claude.
+    slimmedJson = JSON.stringify(slim, null, 2);
     const original = JSON.stringify(menu);
     slimStats = {
       original_chars: original.length,
@@ -54,16 +55,20 @@ export default async function handler(req) {
     ? '(Review pass is skipped in test mode. Toggle "Use Test Model Prompt" off in Step 2 to see the standard confirmatory-check prompt.)'
     : buildReviewPrompt({ firstPassAudit, location, reports });
 
-  // Reflect the thinking setting back so the modal stats can show on/off
-  // and the correct max_tokens / thinking budget.
+  // Reflect the thinking + web-search settings so the modal stats can show
+  // them. max_tokens here mirrors the analyze endpoint's actual logic.
   const useExtendedThinking = body?.useExtendedThinking !== false;
+  const webSearchOn = process.env.ENABLE_WEB_SEARCH === 'true';
+  const maxTokens = useExtendedThinking
+    ? (webSearchOn ? 32000 : 40000)
+    : (webSearchOn ? 24000 : 32000);
 
   return json({
     model: 'claude-sonnet-4-5-20250929',
-    max_tokens: useExtendedThinking ? 24000 : 16000,
+    max_tokens: maxTokens,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
-    web_search: process.env.DISABLE_WEB_SEARCH !== 'true',
+    web_search: webSearchOn,
     test_mode: useTestPrompt,
     location,
     reports_count: reports.length,
