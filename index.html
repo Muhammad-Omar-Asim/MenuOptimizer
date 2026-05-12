@@ -855,9 +855,9 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M4.5 4.5l2 2M17.5 17.5l2 2M4.5 19.5l2-2M17.5 6.5l2-2"/><circle cx="12" cy="12" r="4"/></svg>
           Beautify PDF
         </button>
-        <button class="btn btn-primary" id="download-btn" onclick="downloadPDF('standard')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
-          Download PDF
+        <button class="btn btn-primary" id="create-pdf-btn" onclick="createPDF()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Create PDF
         </button>
       </div>
     </div>
@@ -1494,25 +1494,41 @@
              menu.restaurant?.name || menu.store?.name || null;
     }
 
-    async function downloadPDF(style) {
-      style = (style === 'beautify') ? 'beautify' : 'standard';
-      const btnId = style === 'beautify' ? 'beautify-btn' : 'download-btn';
-      const btn = document.getElementById(btnId);
-      const otherBtn = document.getElementById(style === 'beautify' ? 'download-btn' : 'beautify-btn');
-      const originalLabel = btn.innerHTML;
-      btn.disabled = true;
-      if (otherBtn) otherBtn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> ' +
-        (style === 'beautify' ? 'Beautifying…' : 'Generating PDF…');
-
+    function _resolveRestaurantMeta() {
       const restaurantName =
         guessRestaurantName(currentMenu) ||
         (currentFileName || '').replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() ||
         'Menu';
       const location = (document.getElementById('location-input').value || '').trim();
       const dateStr = new Date().toLocaleDateString(undefined, {
-        year: 'numeric', month: 'long', day: 'numeric'
+        year: 'numeric', month: 'long', day: 'numeric',
       });
+      return { restaurantName, location, dateStr };
+    }
+
+    function _downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Beautify PDF — renders the existing on-screen audit directly. No extra
+    // LLM call. Fast, but no re-formatting of the audit content.
+    async function downloadPDF(style) {
+      style = (style === 'beautify') ? 'beautify' : 'standard';
+      const btn = document.getElementById('beautify-btn');
+      const otherBtn = document.getElementById('create-pdf-btn');
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      if (otherBtn) otherBtn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Beautifying…';
+
+      const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
 
       try {
         const res = await fetch('/api/render-pdf', {
@@ -1534,21 +1550,108 @@
         }
 
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
         const stamp = new Date().toISOString().slice(0, 10);
         const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
         const suffix = style === 'beautify' ? '_Visual' : '';
-        a.download = safeName + '_Menu_Audit' + suffix + '_' + stamp + '.pdf';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        _downloadBlob(blob, safeName + '_Menu_Audit' + suffix + '_' + stamp + '.pdf');
 
-        setStatus('ok', style === 'beautify' ? 'Visual PDF downloaded.' : 'PDF downloaded.');
+        setStatus('ok', 'Visual PDF downloaded.');
       } catch (e) {
         setStatus('error', 'PDF generation failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        if (otherBtn) otherBtn.disabled = false;
+        btn.innerHTML = originalLabel;
+      }
+    }
+
+    // Create PDF — runs the format pass first to produce a client-ready
+    // reformatted version of the audit (deeper sub-sectioning, prose-to-table
+    // conversion, strict GFM formatting), THEN renders that into a visual
+    // PDF. Adds ~20–40s of extra LLM time over Beautify PDF but produces a
+    // far more presentable client deliverable.
+    async function createPDF() {
+      const btn = document.getElementById('create-pdf-btn');
+      const otherBtn = document.getElementById('beautify-btn');
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      if (otherBtn) otherBtn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Formatting report…';
+
+      const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
+      const useExtendedThinking = document.getElementById('enable-thinking').checked;
+
+      try {
+        // Step 1 — stream the format pass.
+        const formatRes = await fetch('/api/format-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auditText: lastAnalysisText || '',
+            location: location || undefined,
+            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+            useExtendedThinking,
+          }),
+        });
+
+        if (!formatRes.ok) {
+          const err = await formatRes.json().catch(() => ({}));
+          throw new Error(err?.error || (formatRes.status + ' ' + formatRes.statusText));
+        }
+
+        const reader = formatRes.body.getReader();
+        const decoder = new TextDecoder();
+        let formattedText = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const lines = decoder.decode(value).split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const obj = JSON.parse(data);
+              if (obj.type === 'content_block_delta' && obj.delta?.text) {
+                formattedText += obj.delta.text;
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (!formattedText.trim()) {
+          throw new Error('Format pass returned empty output');
+        }
+
+        // Step 2 — render the formatted text as a beautified PDF.
+        btn.innerHTML = '<span class="spinner"></span> Rendering PDF…';
+
+        const renderRes = await fetch('/api/render-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audit: formattedText,
+            restaurantName,
+            location,
+            dateStr,
+            reportsCount: supportingReports.length,
+            style: 'beautify',
+          }),
+        });
+
+        if (!renderRes.ok) {
+          const err = await renderRes.json().catch(() => ({}));
+          throw new Error(err?.error || (renderRes.status + ' ' + renderRes.statusText));
+        }
+
+        const blob = await renderRes.blob();
+        const stamp = new Date().toISOString().slice(0, 10);
+        const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
+        _downloadBlob(blob, safeName + '_Menu_Audit_Client_Report_' + stamp + '.pdf');
+
+        setStatus('ok', 'Client report PDF created.');
+      } catch (e) {
+        setStatus('error', 'Create PDF failed: ' + e.message);
       } finally {
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
