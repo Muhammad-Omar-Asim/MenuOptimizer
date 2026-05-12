@@ -1,4 +1,5 @@
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
+import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
 
 export const config = { runtime: 'edge' };
 
@@ -47,6 +48,7 @@ export default async function handler(req) {
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: useExtendedThinking ? 24000 : 16000,
     stream: true,
+    system: buildSystemPrompt({ hasWebSearch: false }),
     messages: [{ role: 'user', content: prompt }],
   };
   if (useExtendedThinking) {

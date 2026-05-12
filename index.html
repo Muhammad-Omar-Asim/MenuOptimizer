@@ -970,6 +970,9 @@
             ? 'on (' + (data.thinking_budget_tokens || 0) + 'tk)'
             : 'off'));
         }
+        if (typeof data.web_search === 'boolean') {
+          stats.push('web search: ' + (data.web_search ? 'on' : 'off'));
+        }
         if (data.test_mode) {
           stats.push('mode: TEST PROMPT');
         }

@@ -63,6 +63,7 @@ export default async function handler(req) {
     max_tokens: useExtendedThinking ? 24000 : 16000,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
+    web_search: process.env.DISABLE_WEB_SEARCH !== 'true',
     test_mode: useTestPrompt,
     location,
     reports_count: reports.length,

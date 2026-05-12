@@ -1,6 +1,7 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
+import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
 
 export const config = { runtime: 'edge' };
 
@@ -63,14 +64,35 @@ export default async function handler(req) {
   // Extended thinking — defaults to true; client passes false to opt out.
   const useExtendedThinking = body?.useExtendedThinking !== false;
 
+  // Web search is enabled by default on analyze. Set DISABLE_WEB_SEARCH=true
+  // in Vercel env vars to turn it off if the Anthropic account doesn't have
+  // the tool enabled (the request will 400 in that case).
+  const enableWebSearch = process.env.DISABLE_WEB_SEARCH !== 'true';
+
+  // Token budget: extended thinking eats up to 8K, web-search tool_use blocks
+  // and their results also count toward output. Give the model breathing room.
+  const maxTokens = useExtendedThinking
+    ? (enableWebSearch ? 32000 : 24000)
+    : (enableWebSearch ? 24000 : 16000);
+
   const payload = {
     model: 'claude-sonnet-4-5-20250929',
-    max_tokens: useExtendedThinking ? 24000 : 16000,
+    max_tokens: maxTokens,
     stream: true,
+    system: buildSystemPrompt({ hasWebSearch: enableWebSearch }),
     messages: [{ role: 'user', content: prompt }],
   };
   if (useExtendedThinking) {
     payload.thinking = { type: 'enabled', budget_tokens: 8000 };
+  }
+  if (enableWebSearch) {
+    payload.tools = [
+      {
+        type: 'web_search_20250305',
+        name: 'web_search',
+        max_uses: 5,
+      },
+    ];
   }
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
