@@ -1,5 +1,6 @@
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
+import { MODEL } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -45,7 +46,7 @@ export default async function handler(req) {
   const useExtendedThinking = body?.useExtendedThinking !== false;
 
   const payload = {
-    model: 'claude-sonnet-4-5-20250929',
+    model: MODEL,
     max_tokens: useExtendedThinking ? 24000 : 16000,
     stream: true,
     system: buildSystemPrompt(),

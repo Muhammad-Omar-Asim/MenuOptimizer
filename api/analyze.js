@@ -2,6 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
+import { MODEL } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -81,7 +82,7 @@ export default async function handler(req) {
     : (enableWebSearch ? 24000 : 32000);
 
   const payload = {
-    model: 'claude-sonnet-4-5-20250929',
+    model: MODEL,
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),

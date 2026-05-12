@@ -2,6 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
+import { MODEL } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -64,7 +65,7 @@ export default async function handler(req) {
     : (webSearchOn ? 24000 : 32000);
 
   return json({
-    model: 'claude-sonnet-4-5-20250929',
+    model: MODEL,
     max_tokens: maxTokens,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
