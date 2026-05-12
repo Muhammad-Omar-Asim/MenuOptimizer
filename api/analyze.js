@@ -1,5 +1,6 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
+import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
 
 export const config = { runtime: 'edge' };
 
@@ -51,7 +52,13 @@ export default async function handler(req) {
     }), { status: 413, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const prompt = buildAnalyzePrompt({ menuJson, location, reports });
+  // Test-mode flag — when true, swap in the experimental single-pass prompt
+  // instead of the structured analyze prompt. The frontend skips review +
+  // validator in test mode.
+  const useTestPrompt = body?.useTestPrompt === true;
+  const prompt = useTestPrompt
+    ? buildTestPrompt({ menuJson, location, reports })
+    : buildAnalyzePrompt({ menuJson, location, reports });
 
   // Extended thinking — defaults to true; client passes false to opt out.
   const useExtendedThinking = body?.useExtendedThinking !== false;

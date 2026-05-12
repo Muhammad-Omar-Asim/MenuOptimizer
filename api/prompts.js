@@ -1,6 +1,7 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
+import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
 
 export const config = { runtime: 'edge' };
 
@@ -24,28 +25,34 @@ export default async function handler(req) {
   const firstPassAudit = String(body?.firstPassAudit || '').trim() ||
     '(no first-pass audit yet — run an analysis first to see the review prompt populated)';
 
+  const useTestPrompt = body?.useTestPrompt === true;
+
   let analyzePrompt = null;
   let slimStats = null;
+  let slimmedJson = '[upload a menu JSON to see this prompt populated]';
 
   if (menu) {
     const slim = slimMenu(menu);
-    const slimmed = JSON.stringify(slim);
+    slimmedJson = JSON.stringify(slim);
     const original = JSON.stringify(menu);
     slimStats = {
       original_chars: original.length,
-      slimmed_chars: slimmed.length,
-      reduction_pct: original.length ? Math.round((1 - slimmed.length / original.length) * 1000) / 10 : 0,
+      slimmed_chars: slimmedJson.length,
+      reduction_pct: original.length ? Math.round((1 - slimmedJson.length / original.length) * 1000) / 10 : 0,
     };
-    analyzePrompt = buildAnalyzePrompt({ menuJson: slimmed, location, reports });
-  } else {
-    analyzePrompt = buildAnalyzePrompt({
-      menuJson: '[upload a menu JSON to see this prompt populated]',
-      location,
-      reports,
-    });
   }
 
-  const reviewPrompt = buildReviewPrompt({ firstPassAudit, location, reports });
+  if (useTestPrompt) {
+    analyzePrompt = buildTestPrompt({ menuJson: slimmedJson, location, reports });
+  } else {
+    analyzePrompt = buildAnalyzePrompt({ menuJson: slimmedJson, location, reports });
+  }
+
+  // In test mode the review pass is skipped, so the modal shows a notice
+  // instead of the review prompt.
+  const reviewPrompt = useTestPrompt
+    ? '(Review pass is skipped in test mode. Toggle "Use Test Model Prompt" off in Step 2 to see the standard confirmatory-check prompt.)'
+    : buildReviewPrompt({ firstPassAudit, location, reports });
 
   // Reflect the thinking setting back so the modal stats can show on/off
   // and the correct max_tokens / thinking budget.
@@ -56,6 +63,7 @@ export default async function handler(req) {
     max_tokens: useExtendedThinking ? 24000 : 16000,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
+    test_mode: useTestPrompt,
     location,
     reports_count: reports.length,
     slim_stats: slimStats,

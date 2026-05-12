@@ -802,6 +802,17 @@
         </label>
       </div>
 
+      <div class="field-block">
+        <label class="toggle-row" for="use-test-prompt">
+          <input type="checkbox" id="use-test-prompt" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-title">Use Test Model Prompt (experimental)</span>
+            <span class="toggle-desc">Run the audit on a single experimental prompt instead of the standard analyze + confirmatory-check flow. The review pass and output validator are skipped when this is on. On-screen metric tiles may stay empty — the test prompt doesn't ask Claude to emit a metrics block.</span>
+          </span>
+        </label>
+      </div>
+
       <div class="btn-row">
         <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
@@ -927,12 +938,14 @@
 
       const location = (document.getElementById('location-input')?.value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking')?.checked !== false;
+      const useTestPrompt = document.getElementById('use-test-prompt')?.checked === true;
       const body = {
         menu: currentMenu || undefined,
         location: location || undefined,
         supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
         firstPassAudit: lastAnalysisText || undefined,
         useExtendedThinking,
+        useTestPrompt,
       };
 
       try {
@@ -956,6 +969,9 @@
           stats.push('thinking: ' + (data.extended_thinking
             ? 'on (' + (data.thinking_budget_tokens || 0) + 'tk)'
             : 'off'));
+        }
+        if (data.test_mode) {
+          stats.push('mode: TEST PROMPT');
         }
         if (data.slim_stats) {
           stats.push('menu: ' + Math.round(data.slim_stats.original_chars / 1000) + 'KB → ' +
@@ -1249,6 +1265,7 @@
 
       const location = (document.getElementById('location-input').value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
+      const useTestPrompt = document.getElementById('use-test-prompt').checked;
 
       try {
         const firstPass = await streamAudit('/api/analyze', {
@@ -1256,8 +1273,17 @@
           location: location || undefined,
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           useExtendedThinking,
+          useTestPrompt,
         });
         if (!firstPass) { resetBtn(); return; }
+
+        if (useTestPrompt) {
+          // Test mode — single pass, no review, no validator auto-escalation.
+          document.getElementById('bottom-actions').style.display = 'flex';
+          setStatus('ok', 'Audit complete (test model prompt — review + validator skipped).');
+          resetBtn();
+          return;
+        }
 
         const enableReview = document.getElementById('enable-review').checked;
         const validationIssues = validateFirstPassOutput(lastAnalysisText, !!location);

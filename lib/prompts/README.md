@@ -9,6 +9,7 @@ edit the file here — no API logic in the way.
 |---|---|
 | `analyze-prompt.js` | First-pass audit prompt sent by `/api/analyze`. Returns a builder `buildAnalyzePrompt({ menuJson, location, reports })`. |
 | `review-prompt.js` | Confirmatory-check prompt sent by `/api/review` after the first pass. Returns `buildReviewPrompt({ firstPassAudit, location, reports })`. |
+| `test-prompt.js` | Experimental single-pass prompt used when the "Use Test Model Prompt" toggle is on in Step 2. `/api/analyze` swaps to it via the `useTestPrompt: true` flag in the request body; review + validator are skipped client-side. |
 | `gold-standard.js` | The structural/depth reference used by the review pass. NOT a fact source — the reviewer is instructed not to copy restaurant-specific items/prices from it. |
 | `slim-menu.js` | Sanitiser that strips base64 images, HTML tags, and oversize strings from the menu before serializing into the analyze prompt. |
 
