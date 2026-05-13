@@ -756,6 +756,21 @@
     }
     .bottom-actions .btn { padding: 14px 28px; }
 
+    /* Review status banner */
+    .review-banner {
+      margin-bottom: 1rem;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(167,139,250,0.08);
+      font-size: 13px; color: var(--text-2);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .review-banner .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-weight: 600; color: var(--purple);
+    }
+    .review-banner.done .badge { color: var(--mint); }
   </style>
 </head>
 <body>
@@ -841,6 +856,17 @@
         </label>
       </div>
 
+      <div class="field-block">
+        <label class="toggle-row" for="enable-review">
+          <input type="checkbox" id="enable-review" checked />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-title">Run confirmatory check (recommended)</span>
+            <span class="toggle-desc">After the first-pass audit completes, run a second pass that uses the first pass as reference and verifies / tightens the findings. Adds about 30–60 seconds.</span>
+          </span>
+        </label>
+      </div>
+
       <div class="reports-required-notice" id="reports-required-notice">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
         <span>
@@ -879,6 +905,13 @@
             Full Analysis
           </div>
         </div>
+        <div class="review-banner" id="review-banner" style="display:none">
+          <span class="badge" id="review-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Confirmatory check
+          </span>
+          <span id="review-status-text">Running the confirmatory pass…</span>
+        </div>
         <div class="analysis-output" id="analysis-text"></div>
       </section>
 
@@ -913,6 +946,10 @@
           <button type="button" class="modal-close" aria-label="Close" onclick="closePromptViewer()">×</button>
         </div>
       </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="analyze" onclick="switchPromptTab('analyze')">Analyze · first pass</button>
+        <button class="modal-tab" data-tab="review" onclick="switchPromptTab('review')">Review · confirmatory</button>
+      </div>
       <div class="modal-body">
         <div class="modal-pane active" id="pane-analyze">
           <div class="pane-toolbar">
@@ -920,6 +957,13 @@
             <button type="button" class="copy-btn" onclick="copyPrompt('analyze', this)">Copy</button>
           </div>
           <pre class="modal-pre" id="prompt-analyze">Loading…</pre>
+        </div>
+        <div class="modal-pane" id="pane-review">
+          <div class="pane-toolbar">
+            <span id="review-meta">Confirmatory-check prompt (uses last first-pass output if present)</span>
+            <button type="button" class="copy-btn" onclick="copyPrompt('review', this)">Copy</button>
+          </div>
+          <pre class="modal-pre" id="prompt-review">Loading…</pre>
         </div>
       </div>
     </div>
@@ -952,7 +996,9 @@
       document.body.style.overflow = 'hidden';
 
       const analyzeEl = document.getElementById('prompt-analyze');
+      const reviewEl = document.getElementById('prompt-review');
       analyzeEl.textContent = 'Loading…';
+      reviewEl.textContent = 'Loading…';
       document.getElementById('prompt-stats').textContent = '';
 
       const location = (document.getElementById('location-input')?.value || '').trim();
@@ -964,6 +1010,7 @@
         menu: currentMenu || undefined,
         location: location || undefined,
         supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+        firstPassAudit: lastAnalysisText || undefined,
         useExtendedThinking,
         mode,
       };
@@ -980,6 +1027,7 @@
         }
         const data = await res.json();
         analyzeEl.textContent = data.analyze || '(empty)';
+        reviewEl.textContent = data.review || '(empty)';
 
         const stats = [];
         stats.push('model: ' + (data.model || '—'));
@@ -1004,15 +1052,30 @@
         document.getElementById('prompt-stats').textContent = stats.join(' · ');
 
         document.getElementById('analyze-meta').textContent =
-          'Audit prompt · ' + (analyzeEl.textContent.length.toLocaleString()) + ' chars';
+          'Analyze prompt · ' + (analyzeEl.textContent.length.toLocaleString()) + ' chars';
+        document.getElementById('review-meta').textContent =
+          (lastAnalysisText
+            ? 'Review prompt · '
+            : 'Review prompt (showing template — run an analysis to see your first-pass injected) · ') +
+          reviewEl.textContent.length.toLocaleString() + ' chars';
       } catch (e) {
         analyzeEl.textContent = 'Failed to load prompts: ' + e.message;
+        reviewEl.textContent = 'Failed to load prompts: ' + e.message;
       }
     }
 
     function closePromptViewer() {
       document.getElementById('prompt-modal').style.display = 'none';
       document.body.style.overflow = '';
+    }
+
+    function switchPromptTab(name) {
+      document.querySelectorAll('.modal-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === name);
+      });
+      document.querySelectorAll('.modal-pane').forEach(el => {
+        el.classList.toggle('active', el.id === 'pane-' + name);
+      });
     }
 
     async function copyPrompt(name, btn) {
@@ -1093,6 +1156,7 @@
       document.getElementById('step2').style.display = 'none';
       document.getElementById('results').style.display = 'none';
       document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('review-banner').style.display = 'none';
       document.getElementById('empty-hint').style.display = '';
     }
 
@@ -1219,19 +1283,20 @@
         return issues;
       }
 
-      // Required section headings for the current analyze prompt. The new
-      // prompt skips a numbered section 7 (jumps 6 → 8) — that's intentional
-      // in the operator's spec.
+      // Required section headings — loose enough to match both the analyze
+      // prompt and the review prompt (which sometimes uses slightly different
+      // wording, e.g. "Image Coverage by Category" vs "Image Coverage by
+      // items in a Category"). Section 7 (Competitive Strategy) is optional
+      // because the review prompt intentionally skips it.
       const requiredHeadings = [
-        { re: /^##\s+1\.\s+Headline Counts\b/m,                                       name: '## 1. Headline Counts' },
-        { re: /^##\s+2\.\s+Image Coverage by items in a Category\b/im,                name: '## 2. Image Coverage by items in a Category' },
-        { re: /^##\s+Description Coverage by items in a Category\b/im,                name: '## Description Coverage by items in a Category' },
-        { re: /^##\s+3\.\s+The "?Upsells"? Finding/m,                                 name: '## 3. The Upsells Finding' },
-        { re: /^##\s+4\.\s+Items in the Wrong Category\b/m,                           name: '## 4. Items in the Wrong Category' },
-        { re: /^##\s+5\.\s+Other Data-Quality Issues\b/m,                             name: '## 5. Other Data-Quality Issues' },
-        { re: /^##\s+6\.\s+Consumer Behaviour (?:&|and) Catchment Analysis\b/m,       name: '## 6. Consumer Behaviour & Catchment Analysis' },
-        { re: /^##\s+8\.\s+Recommendations to Make the Menu More Navigable\b/m,       name: '## 8. Recommendations to Make the Menu More Navigable' },
-        { re: /^##\s+9\.\s+Net Summary\b/m,                                           name: '## 9. Net Summary' },
+        { re: /^##\s+1\.\s+Headline\b/im,             name: 'Section 1 (Headline Counts)' },
+        { re: /^##\s+2\.\s+Image Coverage\b/im,       name: 'Section 2 (Image Coverage)' },
+        { re: /^##\s+3\.\s+The "?Upsells"?/im,        name: 'Section 3 (Upsells Finding)' },
+        { re: /^##\s+4\.\s+Items in the Wrong\b/im,   name: 'Section 4 (Items in Wrong Category)' },
+        { re: /^##\s+5\.\s+Other Data-Quality\b/im,   name: 'Section 5 (Data-Quality Issues)' },
+        { re: /^##\s+6\.\s+Consumer Behaviour\b/im,   name: 'Section 6 (Consumer Behaviour)' },
+        { re: /^##\s+8\.\s+Recommendations\b/im,      name: 'Section 8 (Recommendations)' },
+        { re: /^##\s+9\.\s+Net Summary\b/im,          name: 'Section 9 (Net Summary)' },
       ];
       void hasLocation;
       for (const { re, name } of requiredHeadings) {
@@ -1306,6 +1371,7 @@
       document.getElementById('analysis-text').innerHTML = '';
       document.getElementById('metrics-grid').innerHTML = renderSkeletons();
       document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('review-banner').style.display = 'none';
       lastAnalysisText = ''; lastAnalysisHtml = ''; lastMetrics = null;
 
       const location = (document.getElementById('location-input').value || '').trim();
@@ -1321,23 +1387,44 @@
         });
         if (!ok) { resetBtn(); return; }
 
-        // Quick structural check on the output. Surfaces any missing-heading
-        // or table-format issues to the console so the operator can see what
-        // got skipped, but no longer triggers a second pass (the review
-        // prompt has been retired).
-        const validationIssues = validateFirstPassOutput(lastAnalysisText, !!location);
-        if (validationIssues.length) {
-          console.warn('Audit validation flagged:', validationIssues);
+        // Basic mode is single-pass by design.
+        if (mode === 'basic') {
+          document.getElementById('bottom-actions').style.display = 'flex';
+          setStatus('ok', 'Basic analysis complete. Add business reports and re-run Full Optimize for the data-backed audit.');
+          resetBtn();
+          return;
         }
 
-        document.getElementById('bottom-actions').style.display = 'flex';
-        if (mode === 'basic') {
-          setStatus('ok', 'Basic analysis complete. Add business reports and re-run Full Optimize for the data-backed audit.');
-        } else if (validationIssues.length) {
-          setStatus('ok',
-            'Audit complete (' + validationIssues.length +
-            ' structural warnings — see console). Use Create PDF for the polished version.');
-        } else {
+        // Full mode: optionally chain into the confirmatory review pass.
+        const enableReview = document.getElementById('enable-review').checked;
+        if (!enableReview) {
+          document.getElementById('bottom-actions').style.display = 'flex';
+          setStatus('ok', 'Audit complete (confirmatory check skipped).');
+          resetBtn();
+          return;
+        }
+
+        btn.innerHTML = '<span class="spinner"></span> Running confirmatory check…';
+        const banner = document.getElementById('review-banner');
+        const bannerText = document.getElementById('review-status-text');
+        banner.style.display = 'flex';
+        banner.classList.remove('done');
+        bannerText.textContent = 'Re-producing the audit with the first pass as reference…';
+
+        const firstPassText = lastAnalysisText;
+
+        const reviewed = await streamAudit('/api/review', {
+          menu: currentMenu,
+          location: location || undefined,
+          supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+          firstPassAudit: firstPassText,
+          useExtendedThinking,
+        });
+
+        if (reviewed) {
+          banner.classList.add('done');
+          bannerText.textContent = 'Confirmatory check complete · ready to download.';
+          document.getElementById('bottom-actions').style.display = 'flex';
           setStatus('ok', 'Audit complete.');
         }
       } catch (e) {

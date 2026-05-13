@@ -1,5 +1,6 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
+import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { MODEL } from '../lib/anthropic-config.js';
 
@@ -22,11 +23,13 @@ export default async function handler(req) {
   const menu = body?.menu;
   const location = (body?.location || '').toString().trim();
   const reports = Array.isArray(body?.supportingReports) ? body.supportingReports : [];
+  const firstPassAudit = String(body?.firstPassAudit || '').trim();
 
   const mode = String(body?.mode || '').toLowerCase();
   const useBasicAnalysis = mode === 'basic';
 
   let analyzePrompt = null;
+  let reviewPrompt = null;
   let slimStats = null;
   let slimmedJson = '[upload a menu JSON to see this prompt populated]';
 
@@ -44,8 +47,16 @@ export default async function handler(req) {
 
   if (useBasicAnalysis) {
     analyzePrompt = buildBasicAnalysisPrompt({ menuJson: slimmedJson });
+    reviewPrompt = '(Review pass is skipped in Basic Analysis mode — basic mode is single-pass by design.)';
   } else {
     analyzePrompt = buildAnalyzePrompt({ menuJson: slimmedJson, location, reports });
+    reviewPrompt = buildReviewPrompt({
+      menuJson: slimmedJson,
+      location,
+      reports,
+      firstPassAudit: firstPassAudit ||
+        '(no first-pass audit yet — run the analysis first to see the actual first-pass output injected here)',
+    });
   }
 
   // Reflect the thinking + web-search settings so the modal stats can show
@@ -67,6 +78,7 @@ export default async function handler(req) {
     reports_count: reports.length,
     slim_stats: slimStats,
     analyze: analyzePrompt,
+    review: reviewPrompt,
   });
 }
 
