@@ -388,6 +388,71 @@
       box-shadow: 0 6px 28px rgba(249,168,212,0.40);
     }
     .btn-beautify:hover { box-shadow: 0 8px 36px rgba(249,168,212,0.55); }
+
+    .btn-secondary {
+      background: var(--pill);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .btn-secondary:hover { background: var(--pill-hover); }
+
+    /* No-reports informational notice, shown only when no supporting reports
+       are attached. Sits just above the Optimize / Basic Analysis buttons. */
+    .reports-required-notice {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      background: rgba(251, 191, 36, 0.10);
+      border: 1px solid rgba(251, 191, 36, 0.40);
+      border-radius: var(--radius-sm);
+      color: var(--text-2);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .reports-required-notice.visible { display: flex; }
+    .reports-required-notice svg {
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: var(--amber);
+    }
+    .reports-required-notice b { color: var(--text); }
+
+    /* Circular progress ring used inside the Create PDF button while the
+       format pass is streaming and the PDF is being rendered. */
+    .progress-ring {
+      position: relative;
+      width: 22px; height: 22px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .progress-ring svg {
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+    .progress-ring .pr-track {
+      fill: none;
+      stroke: rgba(11, 13, 24, 0.20);
+      stroke-width: 3;
+    }
+    .progress-ring .pr-fill {
+      fill: none;
+      stroke: #0b0d18;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 56.5487;       /* 2 * π * 9 */
+      stroke-dashoffset: 56.5487;
+      transition: stroke-dashoffset 0.25s ease;
+    }
+    .progress-ring .pr-text {
+      position: absolute;
+      inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8.5px; font-weight: 700;
+      color: #0b0d18;
+      line-height: 1;
+    }
     .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
 
     .hint {
@@ -802,21 +867,21 @@
         </label>
       </div>
 
-      <div class="field-block">
-        <label class="toggle-row" for="use-test-prompt">
-          <input type="checkbox" id="use-test-prompt" />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-text">
-            <span class="toggle-title">Use Test Model Prompt (experimental)</span>
-            <span class="toggle-desc">Run the audit on a single experimental prompt instead of the standard analyze + confirmatory-check flow. The review pass and output validator are skipped when this is on. On-screen metric tiles may stay empty — the test prompt doesn't ask Claude to emit a metrics block.</span>
-          </span>
-        </label>
+      <div class="reports-required-notice" id="reports-required-notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>
+          <b>No business reports provided.</b> Only <b>Basic Analysis</b> is available — a structural audit of the menu JSON without revenue, consumer-behaviour, or competitive insights. Add reports above to unlock <b>Full Optimize</b>.
+        </span>
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis()">
+        <button class="btn btn-primary" id="analyze-btn" onclick="runAnalysis('full')" disabled>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
           Full Optimize
+        </button>
+        <button class="btn btn-secondary" id="basic-analysis-btn" onclick="runAnalysis('basic')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M14 4h-4l-1 5h6z"/></svg>
+          Basic Analysis
         </button>
       </div>
     </section>
@@ -938,14 +1003,16 @@
 
       const location = (document.getElementById('location-input')?.value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking')?.checked !== false;
-      const useTestPrompt = document.getElementById('use-test-prompt')?.checked === true;
+      // The View Prompts modal previews whichever mode would actually run:
+      // basic when there are no reports attached, full otherwise.
+      const mode = supportingReports.length === 0 ? 'basic' : 'full';
       const body = {
         menu: currentMenu || undefined,
         location: location || undefined,
         supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
         firstPassAudit: lastAnalysisText || undefined,
         useExtendedThinking,
-        useTestPrompt,
+        mode,
       };
 
       try {
@@ -973,8 +1040,8 @@
         if (typeof data.web_search === 'boolean') {
           stats.push('web search: ' + (data.web_search ? 'on' : 'off'));
         }
-        if (data.test_mode) {
-          stats.push('mode: TEST PROMPT');
+        if (data.basic_mode) {
+          stats.push('mode: BASIC ANALYSIS');
         }
         if (data.slim_stats) {
           stats.push('menu: ' + Math.round(data.slim_stats.original_chars / 1000) + 'KB → ' +
@@ -1098,6 +1165,7 @@
       step2.style.display = '';
       step2.classList.remove('reveal'); void step2.offsetWidth; step2.classList.add('reveal');
       document.getElementById('empty-hint').style.display = 'none';
+      updateReportsAvailability();
       step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
@@ -1170,6 +1238,25 @@
           '<span class="x" title="Remove" onclick="removeReport(' + i + ')">×</span>' +
         '</span>'
       ).join('');
+      updateReportsAvailability();
+    }
+
+    // When no supporting reports are attached, the full Optimize pipeline
+    // would have to fabricate business analysis (AOV / day-of-week / etc.)
+    // since it has no source data. Disable Full Optimize in that state and
+    // surface a notice telling the user that only Basic Analysis is
+    // available until they add reports.
+    function updateReportsAvailability() {
+      const hasReports = supportingReports.length > 0;
+      const notice = document.getElementById('reports-required-notice');
+      const fullBtn = document.getElementById('analyze-btn');
+      if (notice) notice.classList.toggle('visible', !hasReports);
+      if (fullBtn) {
+        fullBtn.disabled = !hasReports;
+        fullBtn.title = hasReports
+          ? ''
+          : 'Upload supporting business reports above to enable the full audit';
+      }
     }
 
     function removeReport(i) {
@@ -1249,16 +1336,36 @@
         .trim();
     }
 
-    // ----- Run analysis (two-stage: analyze → review) -----
-    async function runAnalysis() {
+    // Tracks which analysis mode the current run used, so resetBtn() can
+    // restore the right button label.
+    let currentRunMode = 'full';
+
+    // ----- Run analysis -----
+    // mode: 'full'  — analyze → review → format-ready output (requires reports)
+    //       'basic' — single-pass structural audit only (no reports required)
+    async function runAnalysis(mode) {
       if (!currentMenu) {
         setStatus('error', 'Please choose a menu JSON file first.');
         return;
       }
+      mode = (mode === 'basic') ? 'basic' : 'full';
+      currentRunMode = mode;
 
-      const btn = document.getElementById('analyze-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Running first-pass audit…';
+      // In full mode but no reports: refuse and prompt the user.
+      if (mode === 'full' && supportingReports.length === 0) {
+        setStatus('error',
+          'Full Optimize requires supporting business reports. Use Basic Analysis instead, or add reports above.');
+        return;
+      }
+
+      const fullBtn = document.getElementById('analyze-btn');
+      const basicBtn = document.getElementById('basic-analysis-btn');
+      const btn = mode === 'basic' ? basicBtn : fullBtn;
+      fullBtn.disabled = true;
+      basicBtn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> ' +
+        (mode === 'basic' ? 'Running basic analysis…' : 'Running first-pass audit…');
+
       document.getElementById('results').style.display = 'block';
       document.getElementById('analysis-text').innerHTML = '';
       document.getElementById('metrics-grid').innerHTML = renderSkeletons();
@@ -1268,7 +1375,6 @@
 
       const location = (document.getElementById('location-input').value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
-      const useTestPrompt = document.getElementById('use-test-prompt').checked;
 
       try {
         const firstPass = await streamAudit('/api/analyze', {
@@ -1276,14 +1382,14 @@
           location: location || undefined,
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           useExtendedThinking,
-          useTestPrompt,
+          mode,
         });
         if (!firstPass) { resetBtn(); return; }
 
-        if (useTestPrompt) {
-          // Test mode — single pass, no review, no validator auto-escalation.
+        if (mode === 'basic') {
+          // Basic mode — single pass, no review, no validator auto-escalation.
           document.getElementById('bottom-actions').style.display = 'flex';
-          setStatus('ok', 'Audit complete (test model prompt — review + validator skipped).');
+          setStatus('ok', 'Basic analysis complete. Add business reports and re-run Full Optimize for the data-backed audit.');
           resetBtn();
           return;
         }
@@ -1455,10 +1561,15 @@
     }
 
     function resetBtn() {
-      const btn = document.getElementById('analyze-btn');
-      btn.disabled = false;
-      btn.innerHTML =
+      const fullBtn = document.getElementById('analyze-btn');
+      const basicBtn = document.getElementById('basic-analysis-btn');
+      fullBtn.innerHTML =
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg> Full Optimize';
+      basicBtn.innerHTML =
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M14 4h-4l-1 5h6z"/></svg> Basic Analysis';
+      basicBtn.disabled = false;
+      // Full Optimize stays disabled when no reports are attached.
+      updateReportsAvailability();
     }
 
     function renderSkeletons() {
@@ -1570,13 +1681,44 @@
     // conversion, strict GFM formatting), THEN renders that into a visual
     // PDF. Adds ~20–40s of extra LLM time over Beautify PDF but produces a
     // far more presentable client deliverable.
+    // ----- Circular progress ring used inside the Create PDF button -------
+    const PROGRESS_RING_CIRC = 56.5487; // 2 * π * 9
+
+    function _renderCreatePdfButton(pct, label) {
+      // Returns the HTML for the Create PDF button while progress is in flight.
+      const pctClamped = Math.max(0, Math.min(100, pct));
+      const offset = PROGRESS_RING_CIRC * (1 - pctClamped / 100);
+      return (
+        '<span class="progress-ring" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24">' +
+            '<circle class="pr-track" cx="12" cy="12" r="9"/>' +
+            '<circle class="pr-fill" cx="12" cy="12" r="9" style="stroke-dashoffset:' + offset + '"/>' +
+          '</svg>' +
+          '<span class="pr-text">' + Math.round(pctClamped) + '%</span>' +
+        '</span>' +
+        ' ' + label
+      );
+    }
+
+    function _setCreatePdfProgress(btn, pct, label) {
+      btn.innerHTML = _renderCreatePdfButton(pct, label);
+    }
+
     async function createPDF() {
       const btn = document.getElementById('create-pdf-btn');
       const otherBtn = document.getElementById('beautify-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (otherBtn) otherBtn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Formatting report…';
+
+      // Rough char-count estimate for progress mapping. The format pass on a
+      // Cave-sized audit produces ~20–30K chars of Markdown. We cap the
+      // format phase at 80% of the bar so the render phase has room to
+      // visibly advance.
+      const FORMAT_TARGET_CHARS = 25000;
+      const FORMAT_PHASE_PCT = 80;
+
+      _setCreatePdfProgress(btn, 0, 'Formatting');
 
       const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
@@ -1602,6 +1744,7 @@
         const reader = formatRes.body.getReader();
         const decoder = new TextDecoder();
         let formattedText = '';
+        let lastPctRendered = 0;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -1617,32 +1760,57 @@
               }
             } catch (_) {}
           }
+          // Update progress no more often than every 1%-of-bar to avoid layout thrash.
+          const formatPct = Math.min(
+            FORMAT_PHASE_PCT,
+            Math.round((formattedText.length / FORMAT_TARGET_CHARS) * FORMAT_PHASE_PCT),
+          );
+          if (formatPct > lastPctRendered) {
+            lastPctRendered = formatPct;
+            _setCreatePdfProgress(btn, formatPct, 'Formatting');
+          }
         }
 
         if (!formattedText.trim()) {
           throw new Error('Format pass returned empty output');
         }
 
-        // Step 2 — render the formatted text as a beautified PDF.
-        btn.innerHTML = '<span class="spinner"></span> Rendering PDF…';
+        // Format phase complete.
+        _setCreatePdfProgress(btn, FORMAT_PHASE_PCT, 'Rendering');
 
-        const renderRes = await fetch('/api/render-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audit: formattedText,
-            restaurantName,
-            location,
-            dateStr,
-            reportsCount: supportingReports.length,
-            style: 'beautify',
-          }),
-        });
+        // Step 2 — render the formatted text as a beautified PDF.
+        // Show an intermediate tick so the bar visibly moves while the
+        // (synchronous-from-our-side) render request is in flight.
+        const renderProgressTimer = setInterval(() => {
+          const fakePct = Math.min(98, lastPctRendered + 2);
+          lastPctRendered = fakePct;
+          _setCreatePdfProgress(btn, fakePct, 'Rendering');
+        }, 600);
+
+        let renderRes;
+        try {
+          renderRes = await fetch('/api/render-pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              audit: formattedText,
+              restaurantName,
+              location,
+              dateStr,
+              reportsCount: supportingReports.length,
+              style: 'beautify',
+            }),
+          });
+        } finally {
+          clearInterval(renderProgressTimer);
+        }
 
         if (!renderRes.ok) {
           const err = await renderRes.json().catch(() => ({}));
           throw new Error(err?.error || (renderRes.status + ' ' + renderRes.statusText));
         }
+
+        _setCreatePdfProgress(btn, 100, 'Done');
 
         const blob = await renderRes.blob();
         const stamp = new Date().toISOString().slice(0, 10);
@@ -1655,7 +1823,9 @@
       } finally {
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
-        btn.innerHTML = originalLabel;
+        // Brief pause so the user sees the 100% completion before the button
+        // reverts to its idle state.
+        setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
       }
     }
 

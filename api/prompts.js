@@ -1,7 +1,7 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
-import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
+import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { MODEL } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
@@ -26,7 +26,8 @@ export default async function handler(req) {
   const firstPassAudit = String(body?.firstPassAudit || '').trim() ||
     '(no first-pass audit yet — run an analysis first to see the review prompt populated)';
 
-  const useTestPrompt = body?.useTestPrompt === true;
+  const mode = String(body?.mode || '').toLowerCase();
+  const useBasicAnalysis = mode === 'basic';
 
   let analyzePrompt = null;
   let slimStats = null;
@@ -44,16 +45,16 @@ export default async function handler(req) {
     };
   }
 
-  if (useTestPrompt) {
-    analyzePrompt = buildTestPrompt({ menuJson: slimmedJson, location, reports });
+  if (useBasicAnalysis) {
+    analyzePrompt = buildBasicAnalysisPrompt({ menuJson: slimmedJson });
   } else {
     analyzePrompt = buildAnalyzePrompt({ menuJson: slimmedJson, location, reports });
   }
 
-  // In test mode the review pass is skipped, so the modal shows a notice
+  // In basic mode the review pass is skipped, so the modal shows a notice
   // instead of the review prompt.
-  const reviewPrompt = useTestPrompt
-    ? '(Review pass is skipped in test mode. Toggle "Use Test Model Prompt" off in Step 2 to see the standard confirmatory-check prompt.)'
+  const reviewPrompt = useBasicAnalysis
+    ? '(Review pass is skipped in Basic Analysis mode — basic mode is single-pass by design.)'
     : buildReviewPrompt({ firstPassAudit, location, reports });
 
   // Reflect the thinking + web-search settings so the modal stats can show
@@ -70,7 +71,7 @@ export default async function handler(req) {
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
     web_search: webSearchOn,
-    test_mode: useTestPrompt,
+    basic_mode: useBasicAnalysis,
     location,
     reports_count: reports.length,
     slim_stats: slimStats,

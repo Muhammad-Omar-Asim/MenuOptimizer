@@ -1,6 +1,6 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
-import { buildTestPrompt } from '../lib/prompts/test-prompt.js';
+import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
 import { MODEL } from '../lib/anthropic-config.js';
 
@@ -62,9 +62,15 @@ export default async function handler(req) {
   // Test-mode flag — when true, swap in the experimental single-pass prompt
   // instead of the structured analyze prompt. The frontend skips review +
   // validator in test mode.
-  const useTestPrompt = body?.useTestPrompt === true;
-  const prompt = useTestPrompt
-    ? buildTestPrompt({ menuJson, location, reports })
+  // Mode selection:
+  //   'basic' → structural-only audit, no business analysis. Auto-selected
+  //             when no supporting reports are attached (the model can't
+  //             produce data-backed business analysis without source data).
+  //   default → full multi-section audit prompt.
+  const mode = String(body?.mode || '').toLowerCase();
+  const useBasicAnalysis = mode === 'basic';
+  const prompt = useBasicAnalysis
+    ? buildBasicAnalysisPrompt({ menuJson })
     : buildAnalyzePrompt({ menuJson, location, reports });
 
   // Extended thinking — defaults to true; client passes false to opt out.
