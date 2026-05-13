@@ -7,8 +7,7 @@ edit the file here — no API logic in the way.
 
 | File | What it does |
 |---|---|
-| `analyze-prompt.js` | First-pass audit prompt sent by `/api/analyze`. Returns a builder `buildAnalyzePrompt({ menuJson, location, reports })`. |
-| `review-prompt.js` | Confirmatory-check prompt sent by `/api/review` after the first pass. Returns `buildReviewPrompt({ firstPassAudit, location, reports })`. |
+| `analyze-prompt.js` | The single-pass audit prompt sent by `/api/analyze` on Full Optimize runs. Returns a builder `buildAnalyzePrompt({ menuJson, location, reports })`. (The previous confirmatory-check / review pass has been retired.) |
 | `format-report-prompt.js` | Third-pass prompt sent by `/api/format-report` when the user clicks **Create PDF**. Reformats the audit into a client-ready report with deep `###` sub-sectioning, prose-to-table conversion, and strict GFM rules. Returns `buildFormatReportPrompt({ auditText, location, reports })`. |
 | `basic-analysis-prompt.js` | Single-pass structural audit prompt. `/api/analyze` swaps to it when the request body has `mode: 'basic'` — triggered by the **Basic Analysis** button, which is auto-suggested when the user uploads a menu JSON without supporting reports. Covers only the eleven structural points (total counts, image/description coverage, category-name quality, miscategorisation, item-name quality, upsell attachment) — never produces business-side reasoning. |
 | `gold-standard.js` | The structural/depth reference used by the review pass. NOT a fact source — the reviewer is instructed not to copy restaurant-specific items/prices from it. |

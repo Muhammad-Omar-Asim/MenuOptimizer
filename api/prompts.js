@@ -1,19 +1,18 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
-import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { MODEL } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
-// Inspect-only endpoint. Returns the exact prompts the analyze/review pipeline
-// would send for the supplied inputs — without calling Anthropic. Used by the
-// "View prompts" modal so users can see (and copy) the wording, with their
+// Inspect-only endpoint. Returns the exact analyze prompt /api/analyze would
+// send for the supplied inputs — without calling Anthropic. Used by the
+// "View prompts" modal so users can see (and copy) the wording with their
 // current menu, location, and reports already substituted in.
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed. POST { menu, location, supportingReports?, firstPassAudit? }' }, 405);
+    return json({ error: 'Method not allowed. POST { menu, location, supportingReports?, mode? }' }, 405);
   }
 
   let body;
@@ -23,8 +22,6 @@ export default async function handler(req) {
   const menu = body?.menu;
   const location = (body?.location || '').toString().trim();
   const reports = Array.isArray(body?.supportingReports) ? body.supportingReports : [];
-  const firstPassAudit = String(body?.firstPassAudit || '').trim() ||
-    '(no first-pass audit yet — run an analysis first to see the review prompt populated)';
 
   const mode = String(body?.mode || '').toLowerCase();
   const useBasicAnalysis = mode === 'basic';
@@ -51,12 +48,6 @@ export default async function handler(req) {
     analyzePrompt = buildAnalyzePrompt({ menuJson: slimmedJson, location, reports });
   }
 
-  // In basic mode the review pass is skipped, so the modal shows a notice
-  // instead of the review prompt.
-  const reviewPrompt = useBasicAnalysis
-    ? '(Review pass is skipped in Basic Analysis mode — basic mode is single-pass by design.)'
-    : buildReviewPrompt({ firstPassAudit, location, reports });
-
   // Reflect the thinking + web-search settings so the modal stats can show
   // them. max_tokens here mirrors the analyze endpoint's actual logic.
   const useExtendedThinking = body?.useExtendedThinking !== false;
@@ -76,7 +67,6 @@ export default async function handler(req) {
     reports_count: reports.length,
     slim_stats: slimStats,
     analyze: analyzePrompt,
-    review: reviewPrompt,
   });
 }
 
