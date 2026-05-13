@@ -651,8 +651,18 @@ def _parse_to_flowables_beautify(md, styles, content_w):
                 flowables.append(t)
                 flowables.append(Spacer(1, 8))
 
-            # Section 2: append a horizontal bar chart visualisation
-            if current_section == 2:
+            # Append a horizontal bar chart whenever the table looks like a
+            # coverage table — header has a "Coverage" column AND at least one
+            # of "Category/Categories/Section". Triggers in BOTH the full
+            # audit (§2 Image Coverage by Category) and the basic analysis
+            # (Item Images section), regardless of section number.
+            header_cells_raw = _split_table_row(table_lines[0]) if table_lines else []
+            header_lc = [c.lower().strip() for c in header_cells_raw]
+            looks_like_coverage = (
+                any('coverage' in h for h in header_lc)
+                and any(h in ('category', 'categories', 'section') for h in header_lc)
+            )
+            if looks_like_coverage:
                 pairs = _extract_coverage_pairs(table_lines)
                 if pairs:
                     flowables.append(Spacer(1, 4))
