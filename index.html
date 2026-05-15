@@ -388,6 +388,12 @@
       box-shadow: 0 6px 28px rgba(249,168,212,0.40);
     }
     .btn-beautify:hover { box-shadow: 0 8px 36px rgba(249,168,212,0.55); }
+    .btn-notion {
+      background: linear-gradient(135deg, #2b2b2b 0%, #4a4a4a 100%);
+      color: #f5f5f5; border: none;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.35);
+    }
+    .btn-notion:hover { box-shadow: 0 8px 36px rgba(0,0,0,0.48); }
 
     .btn-secondary {
       background: var(--pill);
@@ -919,6 +925,10 @@
         <button class="btn btn-beautify" id="beautify-btn" onclick="downloadPDF('beautify')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M4.5 4.5l2 2M17.5 17.5l2 2M4.5 19.5l2-2M17.5 6.5l2-2"/><circle cx="12" cy="12" r="4"/></svg>
           Beautify PDF
+        </button>
+        <button class="btn btn-notion" id="download-md-btn" onclick="downloadMarkdown()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Notion
         </button>
         <button class="btn btn-primary" id="create-pdf-btn" onclick="createPDF()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
@@ -1584,9 +1594,11 @@
       style = (style === 'beautify') ? 'beautify' : 'standard';
       const btn = document.getElementById('beautify-btn');
       const otherBtn = document.getElementById('create-pdf-btn');
+      const mdBtn = document.getElementById('download-md-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (otherBtn) otherBtn.disabled = true;
+      if (mdBtn) mdBtn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Beautifying…';
 
       const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
@@ -1622,6 +1634,7 @@
       } finally {
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
         btn.innerHTML = originalLabel;
       }
     }
@@ -1657,9 +1670,11 @@
     async function createPDF() {
       const btn = document.getElementById('create-pdf-btn');
       const otherBtn = document.getElementById('beautify-btn');
+      const mdBtn = document.getElementById('download-md-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (otherBtn) otherBtn.disabled = true;
+      if (mdBtn) mdBtn.disabled = true;
 
       // Rough char-count estimate for progress mapping. The format pass on a
       // Cave-sized audit produces ~20–30K chars of Markdown. We cap the
@@ -1773,8 +1788,112 @@
       } finally {
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
         // Brief pause so the user sees the 100% completion before the button
         // reverts to its idle state.
+        setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
+      }
+    }
+
+    // Sanitise the format-pass markdown for clean Notion paste / import:
+    //  - strip stray HTML tags the model might have leaked
+    //  - replace Unicode `═══` fences (sometimes echoed from the prompt) with
+    //    a Markdown `---` horizontal rule
+    //  - collapse 3+ blank lines down to 2
+    //  - ensure a single trailing newline
+    function _sanitizeForNotion(md) {
+      let s = String(md || '');
+      s = s.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+      s = s.replace(/^[═]{3,}\s*$/gm, '---');
+      s = s.replace(/\n{3,}/g, '\n\n');
+      if (!s.endsWith('\n')) s += '\n';
+      return s;
+    }
+
+    // Download for Notion — runs the same format pass that Create PDF uses
+    // (so the markdown gets deeper sub-sectioning, prose-to-table conversion,
+    // and strict GFM), then sanitises and downloads as a .md file ready to
+    // paste or import into Notion. No PDF render step.
+    async function downloadMarkdown() {
+      const btn = document.getElementById('download-md-btn');
+      const beautifyBtn = document.getElementById('beautify-btn');
+      const createBtn = document.getElementById('create-pdf-btn');
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      if (beautifyBtn) beautifyBtn.disabled = true;
+      if (createBtn) createBtn.disabled = true;
+
+      const FORMAT_TARGET_CHARS = 25000;
+      _setCreatePdfProgress(btn, 0, 'Formatting');
+
+      const { restaurantName, location } = _resolveRestaurantMeta();
+      const useExtendedThinking = document.getElementById('enable-thinking').checked;
+
+      try {
+        const formatRes = await fetch('/api/format-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auditText: lastAnalysisText || '',
+            location: location || undefined,
+            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+            useExtendedThinking,
+          }),
+        });
+
+        if (!formatRes.ok) {
+          const err = await formatRes.json().catch(() => ({}));
+          throw new Error(err?.error || (formatRes.status + ' ' + formatRes.statusText));
+        }
+
+        const reader = formatRes.body.getReader();
+        const decoder = new TextDecoder();
+        let formattedText = '';
+        let lastPctRendered = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const lines = decoder.decode(value).split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const obj = JSON.parse(data);
+              if (obj.type === 'content_block_delta' && obj.delta?.text) {
+                formattedText += obj.delta.text;
+              }
+            } catch (_) {}
+          }
+          const pct = Math.min(
+            99,
+            Math.round((formattedText.length / FORMAT_TARGET_CHARS) * 99),
+          );
+          if (pct > lastPctRendered) {
+            lastPctRendered = pct;
+            _setCreatePdfProgress(btn, pct, 'Formatting');
+          }
+        }
+
+        if (!formattedText.trim()) {
+          throw new Error('Format pass returned empty output');
+        }
+
+        _setCreatePdfProgress(btn, 100, 'Done');
+
+        const cleaned = _sanitizeForNotion(formattedText);
+        const stamp = new Date().toISOString().slice(0, 10);
+        const safeName = restaurantName.replace(/[^a-z0-9_-]+/gi, '_');
+        const blob = new Blob([cleaned], { type: 'text/markdown;charset=utf-8' });
+        _downloadBlob(blob, safeName + '_Menu_Audit_' + stamp + '.md');
+
+        setStatus('ok', 'Notion Markdown downloaded.');
+      } catch (e) {
+        setStatus('error', 'Markdown download failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        if (beautifyBtn) beautifyBtn.disabled = false;
+        if (createBtn) createBtn.disabled = false;
         setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
       }
     }
