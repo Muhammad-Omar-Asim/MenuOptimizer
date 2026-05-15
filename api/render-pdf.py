@@ -378,20 +378,52 @@ def _make_styles():
     }
 
 
+def _table_block(lines, start):
+    """Collect a block of consecutive pipe-prefixed lines starting at `start`.
+    Returns (block, next_index). A block is any run of 2+ lines whose stripped
+    form starts with '|' AND contains at least 2 pipe characters (so stray
+    single-pipe prose lines don't get misread as a one-cell table). The block
+    may or may not include a GFM separator row; _build_table handles both."""
+    block = []
+    i = start
+    while i < len(lines):
+        s = lines[i].strip()
+        if not s:
+            break
+        if not s.startswith('|'):
+            break
+        if s.count('|') < 2:
+            break
+        block.append(lines[i])
+        i += 1
+    if len(block) >= 2:
+        return block, i
+    return [], start
+
+
 def _build_table(table_lines, content_w, styles):
-    """Build a ReportLab Table from raw markdown lines. Returns None on malformed."""
+    """Build a ReportLab Table from a block of pipe-delimited lines.
+    Lenient: handles missing separator rows and inconsistent column counts
+    across rows by padding short rows and truncating long ones to the
+    widest row in the block. Returns None only on truly empty input."""
     if len(table_lines) < 2:
         return None
 
-    header = _split_table_row(table_lines[0])
-    if not _RE_TABLE_SEP.match(table_lines[1]):
-        return None
-    rows = [_split_table_row(line) for line in table_lines[2:] if line.strip()]
-    n_cols = len(header)
-    if n_cols == 0:
+    # Drop any GFM separator rows (|---|---|) — we'll synthesise our own
+    # styling. Whatever's left is header + data rows.
+    content_lines = [ln for ln in table_lines if not _RE_TABLE_SEP.match(ln)]
+    if len(content_lines) < 1:
         return None
 
-    # Pad/truncate rows to header width
+    parsed = [_split_table_row(ln) for ln in content_lines]
+    header = parsed[0]
+    rows = parsed[1:]
+
+    # Normalise column count: use the widest row in the block.
+    n_cols = max(len(header), max((len(r) for r in rows), default=0))
+    if n_cols == 0:
+        return None
+    header = (header + [''] * n_cols)[:n_cols]
     rows = [(r + [''] * n_cols)[:n_cols] for r in rows]
 
     cell_style = ParagraphStyle('cell', fontName='Helvetica', fontSize=9.5, leading=12, textColor=TEXT)
@@ -509,12 +541,10 @@ def _parse_to_flowables(md, styles, content_w):
             i += 1
             continue
 
-        # Tables — pipe-prefixed line followed by separator line
-        if s.startswith('|') and i + 1 < len(lines) and _RE_TABLE_SEP.match(lines[i + 1]):
-            table_lines = []
-            while i < len(lines) and lines[i].strip().startswith('|'):
-                table_lines.append(lines[i])
-                i += 1
+        # Tables — any block of 2+ pipe-prefixed lines, separator optional
+        table_lines, next_i = _table_block(lines, i)
+        if table_lines:
+            i = next_i
             t = _build_table(table_lines, content_w, styles)
             if t is not None:
                 flowables.append(t)
@@ -632,12 +662,10 @@ def _parse_to_flowables_beautify(md, styles, content_w):
             i += 1
             continue
 
-        # Tables — pipe-prefixed followed by separator
-        if s.startswith('|') and i + 1 < len(lines) and _RE_TABLE_SEP.match(lines[i + 1]):
-            table_lines = []
-            while i < len(lines) and lines[i].strip().startswith('|'):
-                table_lines.append(lines[i])
-                i += 1
+        # Tables — any block of 2+ pipe-prefixed lines, separator optional
+        table_lines, next_i = _table_block(lines, i)
+        if table_lines:
+            i = next_i
 
             # Section 1: prepend a metric-tile grid built from the table
             if current_section == 1:
