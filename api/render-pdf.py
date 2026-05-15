@@ -338,6 +338,30 @@ def inline_md(s: str) -> str:
 _RE_TABLE_SEP = re.compile(r'^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$')
 _RE_BULLET    = re.compile(r'^\s*[-*]\s+(.*)$')
 _RE_NUMBERED  = re.compile(r'^\s*(\d+)\.\s+(.*)$')
+_RE_SEP_CELL  = re.compile(r'^:?-{2,}:?$')
+
+
+def _is_corrupted_separator(line: str) -> bool:
+    """A row whose leading cells are all `---` (3+) but trailing cells are
+    not is a GFM separator with stray data appended on the same line. Drop
+    it so it doesn't render as a row of dashes followed by misaligned data."""
+    cells = _split_table_row(line)
+    if len(cells) < 3:
+        return False
+    leading = 0
+    for c in cells:
+        if _RE_SEP_CELL.match(c.strip()):
+            leading += 1
+        else:
+            break
+    return leading >= 3 and leading < len(cells)
+
+
+def _heading_text(s: str) -> str:
+    """Strip pipes from heading text. The format pass occasionally emits
+    `## Heading | Col1 | Col2 |` when a heading and a table header collapse
+    onto one line — keep only the portion before the first pipe."""
+    return s.split('|', 1)[0].strip()
 
 
 def _is_block_start(line: str) -> bool:
@@ -404,14 +428,18 @@ def _table_block(lines, start):
 def _build_table(table_lines, content_w, styles):
     """Build a ReportLab Table from a block of pipe-delimited lines.
     Lenient: handles missing separator rows and inconsistent column counts
-    across rows by padding short rows and truncating long ones to the
-    widest row in the block. Returns None only on truly empty input."""
+    by padding short rows and truncating long rows to the header width.
+    Returns None only on truly empty input."""
     if len(table_lines) < 2:
         return None
 
     # Drop any GFM separator rows (|---|---|) — we'll synthesise our own
-    # styling. Whatever's left is header + data rows.
-    content_lines = [ln for ln in table_lines if not _RE_TABLE_SEP.match(ln)]
+    # styling. Also drop "corrupted" separator rows where the leading cells
+    # are `---` but trailing cells are stray data values.
+    content_lines = [
+        ln for ln in table_lines
+        if not _RE_TABLE_SEP.match(ln) and not _is_corrupted_separator(ln)
+    ]
     if len(content_lines) < 1:
         return None
 
@@ -419,8 +447,11 @@ def _build_table(table_lines, content_w, styles):
     header = parsed[0]
     rows = parsed[1:]
 
-    # Normalise column count: use the widest row in the block.
-    n_cols = max(len(header), max((len(r) for r in rows), default=0))
+    # Normalise column count to the header width. Rows wider than the header
+    # are almost always two rows merged on one line, or a separator with
+    # appended data — truncate excess cells so one bad row doesn't widen the
+    # whole table and force per-letter column wrapping. Short rows are padded.
+    n_cols = len(header) if header else max((len(r) for r in rows), default=0)
     if n_cols == 0:
         return None
     header = (header + [''] * n_cols)[:n_cols]
@@ -517,12 +548,12 @@ def _parse_to_flowables(md, styles, content_w):
 
         # Headings
         if s.startswith('### '):
-            flowables.append(Paragraph(inline_md(s[4:].strip()), styles['h3']))
+            flowables.append(Paragraph(inline_md(_heading_text(s[4:])), styles['h3']))
             i += 1
             continue
         if s.startswith('## '):
             heading_block = [
-                Paragraph(inline_md(s[3:].strip()), styles['h2']),
+                Paragraph(inline_md(_heading_text(s[3:])), styles['h2']),
                 Spacer(1, 1),
                 GoldRule(content_w, 1.8, GOLD),
                 Spacer(1, 8),
@@ -532,7 +563,7 @@ def _parse_to_flowables(md, styles, content_w):
             continue
         if s.startswith('# '):
             heading_block = [
-                Paragraph(inline_md(s[2:].strip()), styles['h2']),
+                Paragraph(inline_md(_heading_text(s[2:])), styles['h2']),
                 Spacer(1, 1),
                 GoldRule(content_w, 1.8, GOLD),
                 Spacer(1, 8),
@@ -639,11 +670,11 @@ def _parse_to_flowables_beautify(md, styles, content_w):
 
         # Headings — track which section we're in for table-aware enhancements
         if s.startswith('### '):
-            flowables.append(Paragraph(inline_md(s[4:].strip()), styles['h3']))
+            flowables.append(Paragraph(inline_md(_heading_text(s[4:])), styles['h3']))
             i += 1
             continue
         if s.startswith('## ') or s.startswith('# '):
-            heading_text = s[3:].strip() if s.startswith('## ') else s[2:].strip()
+            heading_text = _heading_text(s[3:] if s.startswith('## ') else s[2:])
             # Looser section detection — accept "1.", "1)", "1:", or just "1 " before the name
             sec_m = re.match(r'^(\d+)\s*[.):\s]\s*(.+)$', heading_text)
             if sec_m:
