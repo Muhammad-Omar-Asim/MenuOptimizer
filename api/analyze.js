@@ -70,7 +70,7 @@ export default async function handler(req) {
   const mode = String(body?.mode || '').toLowerCase();
   const useBasicAnalysis = mode === 'basic';
   const prompt = useBasicAnalysis
-    ? buildBasicAnalysisPrompt({ menuJson, location })
+    ? buildBasicAnalysisPrompt({ menuJson })
     : buildAnalyzePrompt({ menuJson, location, reports });
 
   // Extended thinking — defaults to true; client passes false to opt out.
