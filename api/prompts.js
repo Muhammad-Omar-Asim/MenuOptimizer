@@ -46,7 +46,7 @@ export default async function handler(req) {
   }
 
   if (useBasicAnalysis) {
-    analyzePrompt = buildBasicAnalysisPrompt({ menuJson: slimmedJson });
+    analyzePrompt = buildBasicAnalysisPrompt({ menuJson: slimmedJson, location });
     reviewPrompt = '(Review pass is skipped in Basic Analysis mode — basic mode is single-pass by design.)';
   } else {
     analyzePrompt = buildAnalyzePrompt({ menuJson: slimmedJson, location, reports });
