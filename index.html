@@ -1810,10 +1810,10 @@
       return s;
     }
 
-    // Download for Notion — runs the same format pass that Create PDF uses
-    // (so the markdown gets deeper sub-sectioning, prose-to-table conversion,
-    // and strict GFM), then sanitises and downloads as a .md file ready to
-    // paste or import into Notion. No PDF render step.
+    // Download for Notion — runs the Notion-tuned format pass at
+    // /api/format-notion (strict GFM, no HTML, emoji-prefixed headings,
+    // blockquote callouts), sanitises the output and saves as a .md file
+    // ready to paste or import into Notion. No PDF render step.
     async function downloadMarkdown() {
       const btn = document.getElementById('download-md-btn');
       const beautifyBtn = document.getElementById('beautify-btn');
@@ -1830,7 +1830,7 @@
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
 
       try {
-        const formatRes = await fetch('/api/format-report', {
+        const formatRes = await fetch('/api/format-notion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
