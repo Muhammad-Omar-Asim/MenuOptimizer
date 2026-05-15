@@ -331,6 +331,10 @@ def inline_md(s: str) -> str:
     s = re.sub(r'`([^`]+)`', r'<font face="Courier" size="9.5">\1</font>', s)
     # Links — keep label only
     s = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
+    # Strip any ** that didn't pair (paired ones became <b>...</b> above).
+    # The format pass occasionally emits a single stray `**` mid-line which
+    # would otherwise render as literal asterisks in the PDF.
+    s = s.replace('**', '')
     return s
 
 
@@ -362,6 +366,79 @@ def _heading_text(s: str) -> str:
     `## Heading | Col1 | Col2 |` when a heading and a table header collapse
     onto one line — keep only the portion before the first pipe."""
     return s.split('|', 1)[0].strip()
+
+
+# ----- Defensive heuristics against malformed format-pass output -------------
+# These let the renderer detect (and silently work around) common LLM mistakes
+# in the input markdown: missing table headers, wildly wide tables, prose
+# stuffed into table cells, mid-sentence text mis-labelled as a heading, etc.
+MAX_TABLE_COLS   = 8     # tables wider than this get column-truncated
+PROSE_CELL_CHARS = 220   # a cell longer than this is treated as stuffed prose
+
+
+def _looks_like_header_row(cells):
+    """A row is a plausible header if its cells are short label-like strings,
+    not numeric data. Used to decide whether to apply navy header styling
+    (with repeatRows) or treat row 0 as just another data row — prevents
+    the "first data row styled as header + repeated on every page" failure
+    mode when the LLM forgets to emit a header row."""
+    if not cells:
+        return False
+    non_empty = [c for c in cells if c]
+    if not non_empty:
+        return False
+    for c in non_empty:
+        if len(c) > 36:                                      # too long for a label
+            return False
+        if re.search(r'\d', c) and re.search(r'[%£$]', c):   # numeric + currency/% = data
+            return False
+        if re.fullmatch(r'\s*\d+(\.\d+)?\s*', c):            # pure number
+            return False
+        if re.fullmatch(r'\s*\d+\s*/\s*\d+\s*', c):          # "0/13" ratio
+            return False
+    # At least one cell must contain a labelish alpha word.
+    return any(re.search(r'[A-Za-z]{3,}', c) for c in non_empty)
+
+
+def _looks_like_heading(text: str) -> bool:
+    """A heading should be a short noun phrase, not the tail of a sentence
+    the LLM accidentally prefixed with `## `. We reject headings that:
+      - end with sentence punctuation
+      - start with a lowercase word
+      - run on for more than 12 words
+      - exceed 90 chars
+    Lines failing the check fall through to body-paragraph rendering."""
+    t = text.strip()
+    if not t:
+        return False
+    if len(t) > 90:
+        return False
+    if len(t.split()) > 12:
+        return False
+    if t[-1] in '.,;:':
+        return False
+    # First non-whitespace alpha char (skipping leading **/* markers)
+    leading = re.sub(r'^[*_\s]+', '', t)
+    if leading and leading[0].isalpha() and leading[0].islower():
+        return False
+    return True
+
+
+def _drop_prose_rows(rows):
+    """Split rows into (real table rows, prose paragraphs).
+    Any row containing a cell longer than PROSE_CELL_CHARS is almost
+    always a paragraph the LLM stuffed into a table cell by mistake —
+    pulling it out prevents per-letter wrapping across half the page."""
+    kept = []
+    salvaged = []
+    for r in rows:
+        if any(len(c) > PROSE_CELL_CHARS for c in r):
+            text = ' '.join(c for c in r if c).strip()
+            if text:
+                salvaged.append(text)
+        else:
+            kept.append(r)
+    return kept, salvaged
 
 
 def _is_block_start(line: str) -> bool:
@@ -426,38 +503,57 @@ def _table_block(lines, start):
 
 
 def _build_table(table_lines, content_w, styles):
-    """Build a ReportLab Table from a block of pipe-delimited lines.
-    Lenient: handles missing separator rows and inconsistent column counts
-    by padding short rows and truncating long rows to the header width.
-    Returns None only on truly empty input."""
+    """Build a list of flowables from a block of pipe-delimited lines.
+    Hardened against malformed format-pass output: missing separators,
+    missing headers, prose stuffed into cells, runaway column counts, etc.
+    Returns [] when there's nothing to render."""
     if len(table_lines) < 2:
-        return None
+        return []
 
-    # Drop any GFM separator rows (|---|---|) — we'll synthesise our own
-    # styling. Also drop "corrupted" separator rows where the leading cells
-    # are `---` but trailing cells are stray data values.
+    # Drop GFM separator rows (|---|---|) and "corrupted" separator rows
+    # (leading `---` cells with stray data appended). Both are noise.
     content_lines = [
         ln for ln in table_lines
         if not _RE_TABLE_SEP.match(ln) and not _is_corrupted_separator(ln)
     ]
     if len(content_lines) < 1:
-        return None
+        return []
 
     parsed = [_split_table_row(ln) for ln in content_lines]
-    header = parsed[0]
-    rows = parsed[1:]
+    first_row = parsed[0]
+    rest = parsed[1:]
 
-    # Normalise column count to the header width. Rows wider than the header
-    # are almost always two rows merged on one line, or a separator with
-    # appended data — truncate excess cells so one bad row doesn't widen the
-    # whole table and force per-letter column wrapping. Short rows are padded.
-    n_cols = len(header) if header else max((len(r) for r in rows), default=0)
+    # Detect whether row 0 is a real header. If it's data-shaped, treat the
+    # whole block as data — no navy header strip, no repeatRows. Otherwise
+    # a forgotten-header table would render the first data row in navy AND
+    # repeat it across every page break.
+    has_header = _looks_like_header_row(first_row)
+    if has_header:
+        header = first_row
+        rows = rest
+    else:
+        header = []
+        rows = [first_row] + rest
+
+    # Column count: cap at MAX_TABLE_COLS to prevent per-letter wrapping
+    # when the LLM produces an absurdly wide row.
+    width_source = header if header else (rows[0] if rows else [])
+    n_cols = len(width_source) if width_source else max((len(r) for r in rows), default=0)
     if n_cols == 0:
-        return None
-    header = (header + [''] * n_cols)[:n_cols]
+        return []
+    if n_cols > MAX_TABLE_COLS:
+        n_cols = MAX_TABLE_COLS
+    header = (header + [''] * n_cols)[:n_cols] if header else []
     rows = [(r + [''] * n_cols)[:n_cols] for r in rows]
 
-    cell_style = ParagraphStyle('cell', fontName='Helvetica', fontSize=9.5, leading=12, textColor=TEXT)
+    # Pull rows where one cell is a stuffed paragraph out of the table; emit
+    # them as body paragraphs after the table so they read normally.
+    rows, prose_rows = _drop_prose_rows(rows)
+
+    if not rows and not header:
+        return [Paragraph(inline_md(p), styles['body']) for p in prose_rows]
+
+    cell_style   = ParagraphStyle('cell',  fontName='Helvetica',      fontSize=9.5, leading=12, textColor=TEXT)
     header_style = ParagraphStyle('hcell', fontName='Helvetica-Bold', fontSize=9.5, leading=12, textColor=colors.white)
 
     coverage_idx = next(
@@ -465,8 +561,9 @@ def _build_table(table_lines, content_w, styles):
         None
     )
 
-    # Build data with Paragraphs so wrapping works
-    data = [[Paragraph(inline_md(h), header_style) for h in header]]
+    data = []
+    if header:
+        data.append([Paragraph(inline_md(h), header_style) for h in header])
     for row in rows:
         data.append([Paragraph(inline_md(c), cell_style) for c in row])
 
@@ -489,38 +586,48 @@ def _build_table(table_lines, content_w, styles):
     else:
         col_widths = fixed_widths
 
-    table = Table(data, colWidths=col_widths, repeatRows=1, hAlign='LEFT')
+    repeat_rows = 1 if header else 0
+    table = Table(data, colWidths=col_widths, repeatRows=repeat_rows, hAlign='LEFT')
 
     style_cmds = [
-        ('BACKGROUND',   (0, 0), (-1, 0), NAVY),
-        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
-        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
         ('GRID',         (0, 0), (-1, -1), 0.4, BORDER),
         ('LEFTPADDING',  (0, 0), (-1, -1), 7),
         ('RIGHTPADDING', (0, 0), (-1, -1), 7),
-        ('TOPPADDING',   (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING',(0, 0), (-1, 0), 8),
-        ('TOPPADDING',   (0, 1), (-1, -1), 6),
-        ('BOTTOMPADDING',(0, 1), (-1, -1), 6),
     ]
+    if header:
+        style_cmds.extend([
+            ('BACKGROUND',    (0, 0), (-1, 0), NAVY),
+            ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+            ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('TOPPADDING',    (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING',    (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ])
+    else:
+        style_cmds.extend([
+            ('TOPPADDING',    (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ])
 
     # Right-align numeric columns; centre + bold the Coverage column body
+    data_start = 1 if header else 0
     for i, h in enumerate(header):
         h_lower = h.lower().strip()
         if h_lower in ('items', 'images', 'count'):
-            style_cmds.append(('ALIGN', (i, 1), (i, -1), 'RIGHT'))
+            style_cmds.append(('ALIGN', (i, data_start), (i, -1), 'RIGHT'))
         elif h_lower == 'coverage':
-            style_cmds.append(('ALIGN', (i, 1), (i, -1), 'CENTER'))
-            style_cmds.append(('FONTNAME', (i, 1), (i, -1), 'Helvetica-Bold'))
+            style_cmds.append(('ALIGN', (i, data_start), (i, -1), 'CENTER'))
+            style_cmds.append(('FONTNAME', (i, data_start), (i, -1), 'Helvetica-Bold'))
 
     # Zebra striping for body rows (every other body row = zebra fill)
-    for r in range(1, len(data)):
-        if r % 2 == 0:
+    for r in range(data_start, len(data)):
+        if (r - data_start) % 2 == 1:
             style_cmds.append(('BACKGROUND', (0, r), (-1, r), ZEBRA))
 
-    # 100% / ✓ → green, 0% / ✗ → red, but only on the Coverage table.
-    if coverage_idx is not None:
+    # 100% / ✓ → green, 0% / ✗ → red — only when there's a real Coverage header.
+    if coverage_idx is not None and header:
         for r in range(1, len(data)):
             cov_text = rows[r - 1][coverage_idx]
             if re.search(r'(?:^|[^\d])100\s*%', cov_text) or '✓' in cov_text:
@@ -531,7 +638,12 @@ def _build_table(table_lines, content_w, styles):
                 style_cmds.append(('TEXTCOLOR', (coverage_idx, r), (coverage_idx, r), RED_TEXT))
 
     table.setStyle(TableStyle(style_cmds))
-    return table
+
+    out = [table]
+    for prose in prose_rows:
+        out.append(Spacer(1, 4))
+        out.append(Paragraph(inline_md(prose), styles['body']))
+    return out
 
 
 def _parse_to_flowables(md, styles, content_w):
@@ -546,39 +658,57 @@ def _parse_to_flowables(md, styles, content_w):
             i += 1
             continue
 
-        # Headings
+        # Headings — also reject mid-sentence text mis-labelled as a heading
+        # (e.g. `## increase average order value on every transaction.`) by
+        # falling through to body rendering when the text fails the check.
         if s.startswith('### '):
-            flowables.append(Paragraph(inline_md(_heading_text(s[4:])), styles['h3']))
+            text = _heading_text(s[4:])
+            if _looks_like_heading(text):
+                flowables.append(Paragraph(inline_md(text), styles['h3']))
+                i += 1
+                continue
+            flowables.append(Paragraph(inline_md(text), styles['body']))
             i += 1
             continue
         if s.startswith('## '):
-            heading_block = [
-                Paragraph(inline_md(_heading_text(s[3:])), styles['h2']),
-                Spacer(1, 1),
-                GoldRule(content_w, 1.8, GOLD),
-                Spacer(1, 8),
-            ]
-            flowables.append(KeepTogether(heading_block))
+            text = _heading_text(s[3:])
+            if _looks_like_heading(text):
+                heading_block = [
+                    Paragraph(inline_md(text), styles['h2']),
+                    Spacer(1, 1),
+                    GoldRule(content_w, 1.8, GOLD),
+                    Spacer(1, 8),
+                ]
+                flowables.append(KeepTogether(heading_block))
+                i += 1
+                continue
+            flowables.append(Paragraph(inline_md(text), styles['body']))
             i += 1
             continue
         if s.startswith('# '):
-            heading_block = [
-                Paragraph(inline_md(_heading_text(s[2:])), styles['h2']),
-                Spacer(1, 1),
-                GoldRule(content_w, 1.8, GOLD),
-                Spacer(1, 8),
-            ]
-            flowables.append(KeepTogether(heading_block))
+            text = _heading_text(s[2:])
+            if _looks_like_heading(text):
+                heading_block = [
+                    Paragraph(inline_md(text), styles['h2']),
+                    Spacer(1, 1),
+                    GoldRule(content_w, 1.8, GOLD),
+                    Spacer(1, 8),
+                ]
+                flowables.append(KeepTogether(heading_block))
+                i += 1
+                continue
+            flowables.append(Paragraph(inline_md(text), styles['body']))
             i += 1
             continue
 
-        # Tables — any block of 2+ pipe-prefixed lines, separator optional
+        # Tables — any block of 2+ pipe-prefixed lines, separator optional.
+        # _build_table returns a flowables list (table + salvaged prose).
         table_lines, next_i = _table_block(lines, i)
         if table_lines:
             i = next_i
-            t = _build_table(table_lines, content_w, styles)
-            if t is not None:
-                flowables.append(t)
+            tflows = _build_table(table_lines, content_w, styles)
+            if tflows:
+                flowables.extend(tflows)
                 flowables.append(Spacer(1, 8))
             continue
 
@@ -668,13 +798,23 @@ def _parse_to_flowables_beautify(md, styles, content_w):
             i += 1
             continue
 
-        # Headings — track which section we're in for table-aware enhancements
+        # Headings — track which section we're in for table-aware enhancements.
+        # Mid-sentence text mis-labelled as a heading falls through to body.
         if s.startswith('### '):
-            flowables.append(Paragraph(inline_md(_heading_text(s[4:])), styles['h3']))
+            text = _heading_text(s[4:])
+            if _looks_like_heading(text):
+                flowables.append(Paragraph(inline_md(text), styles['h3']))
+            else:
+                flowables.append(Paragraph(inline_md(text), styles['body']))
             i += 1
             continue
         if s.startswith('## ') or s.startswith('# '):
             heading_text = _heading_text(s[3:] if s.startswith('## ') else s[2:])
+            if not _looks_like_heading(heading_text):
+                # Demote prose mis-labelled as a heading.
+                flowables.append(Paragraph(inline_md(heading_text), styles['body']))
+                i += 1
+                continue
             # Looser section detection — accept "1.", "1)", "1:", or just "1 " before the name
             sec_m = re.match(r'^(\d+)\s*[.):\s]\s*(.+)$', heading_text)
             if sec_m:
@@ -693,7 +833,8 @@ def _parse_to_flowables_beautify(md, styles, content_w):
             i += 1
             continue
 
-        # Tables — any block of 2+ pipe-prefixed lines, separator optional
+        # Tables — any block of 2+ pipe-prefixed lines, separator optional.
+        # _build_table returns a flowables list (table + salvaged prose).
         table_lines, next_i = _table_block(lines, i)
         if table_lines:
             i = next_i
@@ -705,9 +846,9 @@ def _parse_to_flowables_beautify(md, styles, content_w):
                     flowables.append(MetricTileGrid(tiles, content_w))
                     flowables.append(Spacer(1, 12))
 
-            t = _build_table(table_lines, content_w, styles)
-            if t is not None:
-                flowables.append(t)
+            tflows = _build_table(table_lines, content_w, styles)
+            if tflows:
+                flowables.extend(tflows)
                 flowables.append(Spacer(1, 8))
 
             # Append a horizontal bar chart whenever the table looks like a
