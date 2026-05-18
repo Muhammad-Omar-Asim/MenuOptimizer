@@ -1682,36 +1682,18 @@
       // stays in the DOM but hidden (we may re-enable it later).
       _resetAnalysisProgress();
 
-      // Target char-count for the progress bar. Real audits land between
-      // 15k–35k chars; 30k makes the bar feel "almost done" by the time
-      // the LLM is wrapping up, then it jumps to 100% on stream end.
-      const PROGRESS_TARGET_CHARS = 30000;
+      // Target char-count for the progress bar. We count both extended-
+      // thinking chunks AND text output, so the target is set above
+      // text-only audit length to keep the bar from flat-lining at 100%
+      // before the stream ends.
+      const PROGRESS_TARGET_CHARS = 35000;
       const PROGRESS_CAP_PCT = 96;
+      // Heartbeat ceiling: how far the bar may creep up while waiting
+      // for the first stream chunk (Anthropic can take 20–40s to start
+      // streaming when extended thinking is enabled).
+      const HEARTBEAT_MAX_PCT = 10;
 
-      let response;
-      try {
-        response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-      } catch (e) {
-        setStatus('error', 'Network error: ' + e.message);
-        return false;
-      }
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        setStatus('error', 'Server error ' + response.status + ': ' + (err?.error || response.statusText));
-        return false;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-      let metricsExtracted = !!lastMetrics;
       const checkpointFired = new Array(ANALYSIS_CHECKPOINTS.length).fill(false);
-
       const maybeFireCheckpoints = () => {
         for (let i = 0; i < ANALYSIS_CHECKPOINTS.length; i++) {
           if (checkpointFired[i]) continue;
@@ -1721,6 +1703,52 @@
           }
         }
       };
+
+      // Fire the first checkpoint immediately so the user sees ✓
+      // Initiating Analysis the moment they click — before Anthropic has
+      // even started thinking.
+      checkpointFired[0] = true;
+      _markCheckpoint(ANALYSIS_CHECKPOINTS[0].label);
+
+      // Heartbeat — bumps the bar slowly while we wait for the first
+      // stream chunk. Cleared the moment real data starts arriving.
+      let lastBarPct = 1.5;
+      _setAnalysisProgressBar(lastBarPct);
+      const heartbeatTick = setInterval(() => {
+        lastBarPct = Math.min(HEARTBEAT_MAX_PCT, lastBarPct + 0.5);
+        _setAnalysisProgressBar(lastBarPct);
+      }, 800);
+
+      const cleanupHeartbeat = () => {
+        if (heartbeatTick) clearInterval(heartbeatTick);
+      };
+
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch (e) {
+        cleanupHeartbeat();
+        setStatus('error', 'Network error: ' + e.message);
+        return false;
+      }
+
+      if (!response.ok) {
+        cleanupHeartbeat();
+        const err = await response.json().catch(() => ({}));
+        setStatus('error', 'Server error ' + response.status + ': ' + (err?.error || response.statusText));
+        return false;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let metricsExtracted = !!lastMetrics;
+      let thinkingChars = 0;
+      let firstChunkSeen = false;
 
       try {
         while (true) {
@@ -1733,7 +1761,12 @@
             if (data === '[DONE]') continue;
             try {
               const obj = JSON.parse(data);
-              if (obj.type === 'content_block_delta' && obj.delta?.text) {
+              if (obj.type !== 'content_block_delta') continue;
+              if (!firstChunkSeen) {
+                firstChunkSeen = true;
+                cleanupHeartbeat();
+              }
+              if (obj.delta?.text) {
                 fullText += obj.delta.text;
                 if (!metricsExtracted && fullText.includes('JSON>>>')) {
                   const match = fullText.match(/<<<\s*JSON\s*([\s\S]*?)\s*JSON\s*>>>/);
@@ -1746,22 +1779,30 @@
                   }
                 }
                 lastAnalysisText = stripMetricMarkers(fullText);
-                // Update progress bar (smooth) and checklist (discrete).
-                _setAnalysisProgressBar(
-                  Math.min(PROGRESS_CAP_PCT, (lastAnalysisText.length / PROGRESS_TARGET_CHARS) * 100),
-                );
                 maybeFireCheckpoints();
+              } else if (obj.delta?.thinking) {
+                // Extended thinking content — keep the bar moving even
+                // before the model emits any actual audit text.
+                thinkingChars += obj.delta.thinking.length;
+              }
+              const total = lastAnalysisText.length + thinkingChars;
+              const dataPct = Math.min(PROGRESS_CAP_PCT, (total / PROGRESS_TARGET_CHARS) * 100);
+              if (dataPct > lastBarPct) {
+                lastBarPct = dataPct;
+                _setAnalysisProgressBar(dataPct);
               }
             } catch (e) {}
           }
         }
       } catch (e) {
+        cleanupHeartbeat();
         setStatus('error', 'Stream error: ' + e.message);
         return false;
       }
+      cleanupHeartbeat();
 
-      // Stream ended — fire any remaining checkpoints, jump to 100%, fade in the
-      // completion message.
+      // Stream ended — fire any remaining checkpoints, jump to 100%,
+      // fade in the completion message.
       for (let i = 0; i < ANALYSIS_CHECKPOINTS.length; i++) {
         if (!checkpointFired[i]) {
           checkpointFired[i] = true;
