@@ -759,6 +759,118 @@
       .modal-backdrop { padding: 0; }
     }
 
+    /* Analysis progress UI (replaces the streaming markdown panel
+       while the LLM analyse pass runs). Progress bar at the top, then a
+       fade-in checklist of completed milestones below, then a final
+       completion message when the stream ends. */
+    .analysis-progress {
+      padding: 1.5rem 0.5rem 0.5rem;
+    }
+    .analysis-progress-bar {
+      width: 100%; height: 8px;
+      background: rgba(127,127,127,0.18);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .analysis-progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #a78bfa 0%, #f9a8d4 100%);
+      transition: width 0.4s ease-out;
+      border-radius: 4px;
+    }
+    .analysis-progress-pct {
+      text-align: center;
+      margin: 10px 0 24px;
+      font-size: 13px;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+    }
+    .analysis-checklist {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .analysis-checklist li {
+      padding: 8px 4px;
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-2);
+      font-size: 14px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+    }
+    .analysis-checklist li.shown {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .analysis-checklist li .tick {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(74,222,128,0.18);
+      color: #4ade80;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .analysis-complete {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 15px; line-height: 1.7;
+      color: var(--text-2);
+      opacity: 0;
+      transition: opacity 0.9s ease-out;
+    }
+    .analysis-complete.shown { opacity: 1; }
+    .analysis-complete strong { color: var(--text); }
+
+    /* "Formatting in Notion.." modal — shown after Send to Notion's API
+       call succeeds. Stays up for 60s with a smoothly-advancing bar
+       before the page link is revealed. */
+    .format-modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      animation: fmFadeIn 0.25s ease-out;
+    }
+    @keyframes fmFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .format-modal-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 32px 40px;
+      min-width: 360px; max-width: 90vw;
+      text-align: center;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    }
+    .format-modal-title {
+      font: 600 17px 'DM Sans', sans-serif;
+      color: var(--text);
+      margin-bottom: 22px;
+    }
+    .format-modal-bar {
+      width: 100%; height: 10px;
+      background: rgba(127,127,127,0.18);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .format-modal-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #a78bfa 0%, #f9a8d4 100%);
+      transition: width 1s linear;
+    }
+    .format-modal-pct {
+      margin-top: 12px;
+      font-size: 13px; color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+    }
+    .format-modal-hint {
+      margin-top: 18px;
+      font-size: 12.5px;
+      font-style: italic;
+      color: var(--text-3);
+    }
+
     /* Bottom action bar */
     .bottom-actions {
       margin-top: 1.25rem;
@@ -946,7 +1058,24 @@
           </span>
           <span id="review-status-text">Running the confirmatory pass…</span>
         </div>
-        <div class="analysis-output" id="analysis-text"></div>
+        <!-- Streaming markdown output — hidden for now (we may re-enable later).
+             lastAnalysisText still gets populated from the stream so the
+             Send to Notion button has audit content to send. -->
+        <div class="analysis-output" id="analysis-text" style="display:none"></div>
+
+        <!-- New progress UI replaces the streaming output while the audit runs. -->
+        <div class="analysis-progress" id="analysis-progress" style="display:none">
+          <div class="analysis-progress-bar">
+            <div class="analysis-progress-fill" id="analysis-progress-fill"></div>
+          </div>
+          <div class="analysis-progress-pct" id="analysis-progress-pct">0%</div>
+          <ul class="analysis-checklist" id="analysis-checklist"></ul>
+          <div class="analysis-complete" id="analysis-complete" style="display:none">
+            <strong>Report prepared.</strong><br>
+            Brought to you by the <strong>Flipdish Menu Team</strong>.<br>
+            Click below to initiate export to Notion database.
+          </div>
+        </div>
       </section>
 
       <div class="bottom-actions" id="bottom-actions" style="display:none">
@@ -1009,6 +1138,19 @@
           <pre class="modal-pre" id="prompt-review">Loading…</pre>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- "Formatting in Notion.." overlay — shown for ~60s after Send to Notion
+       creates the page, before the page link is revealed. -->
+  <div class="format-modal-backdrop" id="format-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="format-modal-title">
+    <div class="format-modal-card">
+      <div class="format-modal-title" id="format-modal-title">Formatting in Notion..</div>
+      <div class="format-modal-bar">
+        <div class="format-modal-fill" id="format-modal-fill"></div>
+      </div>
+      <div class="format-modal-pct" id="format-modal-pct">0%</div>
+      <div class="format-modal-hint">Applying styles, tables, and section colours.</div>
     </div>
   </div>
 
@@ -1202,6 +1344,7 @@
       document.getElementById('notion-result').style.display = 'none';
       document.getElementById('notion-result').innerHTML = '';
       document.getElementById('review-banner').style.display = 'none';
+      document.getElementById('analysis-progress').style.display = 'none';
       document.getElementById('empty-hint').style.display = '';
     }
 
@@ -1481,8 +1624,69 @@
       resetBtn();
     }
 
+    // Checkpoint markers that drive the analysis-progress checklist.
+    // The pattern is matched against the accumulated audit text; the first
+    // time it matches, the corresponding checklist item appears with a
+    // green tick. The first item ("Initiating Analysis") fires on stream
+    // start; the last ("Report Prepared") fires on stream end.
+    const ANALYSIS_CHECKPOINTS = [
+      { label: 'Initiating Analysis',         test: () => true },
+      { label: 'Reviewing Menu Structure',    test: t => /menu structure analysis|top-level menu|## menu structure/i.test(t) },
+      { label: 'Analysing Category Coverage', test: t => /coverage analysis|per-category|image coverage by category/i.test(t) },
+      { label: 'Reviewing Revenue & Upsells', test: t => /revenue optimization|upsells present|upsell coverage/i.test(t) },
+      { label: 'Detecting Misclassifications',test: t => /misclassification detection|items in the wrong category/i.test(t) },
+      { label: 'Compiling Recommendations',   test: t => /final strategic recommendations|prioritised action plan|high-impact quick wins/i.test(t) },
+    ];
+
+    function _resetAnalysisProgress() {
+      const checklist = document.getElementById('analysis-checklist');
+      const complete = document.getElementById('analysis-complete');
+      const fill = document.getElementById('analysis-progress-fill');
+      const pct = document.getElementById('analysis-progress-pct');
+      checklist.innerHTML = '';
+      complete.classList.remove('shown');
+      complete.style.display = 'none';
+      fill.style.width = '0%';
+      pct.textContent = '0%';
+      document.getElementById('analysis-progress').style.display = 'block';
+    }
+
+    function _markCheckpoint(label) {
+      const checklist = document.getElementById('analysis-checklist');
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="tick">✓</span>' + label;
+      checklist.appendChild(li);
+      // Force a reflow so the transition fires
+      // eslint-disable-next-line no-unused-expressions
+      li.offsetHeight;
+      li.classList.add('shown');
+    }
+
+    function _setAnalysisProgressBar(pct) {
+      const fill = document.getElementById('analysis-progress-fill');
+      const lbl = document.getElementById('analysis-progress-pct');
+      const clamped = Math.max(0, Math.min(100, pct));
+      fill.style.width = clamped + '%';
+      lbl.textContent = Math.round(clamped) + '%';
+    }
+
+    function _showAnalysisComplete() {
+      const el = document.getElementById('analysis-complete');
+      el.style.display = 'block';
+      // small delay so the last checklist item is visible first
+      setTimeout(() => el.classList.add('shown'), 200);
+    }
+
     async function streamAudit(endpoint, body) {
-      const analysisEl = document.getElementById('analysis-text');
+      // Show + reset the new progress UI. The streaming markdown panel
+      // stays in the DOM but hidden (we may re-enable it later).
+      _resetAnalysisProgress();
+
+      // Target char-count for the progress bar. Real audits land between
+      // 15k–35k chars; 30k makes the bar feel "almost done" by the time
+      // the LLM is wrapping up, then it jumps to 100% on stream end.
+      const PROGRESS_TARGET_CHARS = 30000;
+      const PROGRESS_CAP_PCT = 96;
 
       let response;
       try {
@@ -1506,15 +1710,16 @@
       const decoder = new TextDecoder();
       let fullText = '';
       let metricsExtracted = !!lastMetrics;
-      let renderTimer = null;
+      const checkpointFired = new Array(ANALYSIS_CHECKPOINTS.length).fill(false);
 
-      const scheduleRender = () => {
-        if (renderTimer) return;
-        renderTimer = setTimeout(() => {
-          renderTimer = null;
-          const md = lastAnalysisText + '\n\n▋';
-          analysisEl.innerHTML = window.marked ? marked.parse(md) : escapeHtml(md);
-        }, 80);
+      const maybeFireCheckpoints = () => {
+        for (let i = 0; i < ANALYSIS_CHECKPOINTS.length; i++) {
+          if (checkpointFired[i]) continue;
+          if (ANALYSIS_CHECKPOINTS[i].test(lastAnalysisText)) {
+            checkpointFired[i] = true;
+            _markCheckpoint(ANALYSIS_CHECKPOINTS[i].label);
+          }
+        }
       };
 
       try {
@@ -1541,7 +1746,11 @@
                   }
                 }
                 lastAnalysisText = stripMetricMarkers(fullText);
-                scheduleRender();
+                // Update progress bar (smooth) and checklist (discrete).
+                _setAnalysisProgressBar(
+                  Math.min(PROGRESS_CAP_PCT, (lastAnalysisText.length / PROGRESS_TARGET_CHARS) * 100),
+                );
+                maybeFireCheckpoints();
               }
             } catch (e) {}
           }
@@ -1551,9 +1760,21 @@
         return false;
       }
 
-      // Final render without cursor
+      // Stream ended — fire any remaining checkpoints, jump to 100%, fade in the
+      // completion message.
+      for (let i = 0; i < ANALYSIS_CHECKPOINTS.length; i++) {
+        if (!checkpointFired[i]) {
+          checkpointFired[i] = true;
+          _markCheckpoint(ANALYSIS_CHECKPOINTS[i].label);
+        }
+      }
+      _setAnalysisProgressBar(100);
+      _showAnalysisComplete();
+
+      // Keep the markdown pre-rendered for any future re-enable of the
+      // streaming output panel — but don't actually display it.
       lastAnalysisHtml = window.marked ? marked.parse(lastAnalysisText) : escapeHtml(lastAnalysisText);
-      analysisEl.innerHTML = lastAnalysisHtml;
+      // (analysis-text element stays display:none)
       return true;
     }
 
@@ -1944,10 +2165,51 @@
       }
     }
 
-    // Send to Notion — runs the same Notion-tuned format pass that
-    // downloadMarkdown() uses, then POSTs the result to /api/send-to-notion
-    // which converts the markdown to Notion blocks and creates a new page
-    // under the configured parent. On success, surfaces the new page URL.
+    // Animate the "Formatting in Notion.." modal for `durationMs` and call
+    // `onDone()` when the bar reaches 100%. Notion's API is actually
+    // synchronous (the page is fully created when /api/send-to-notion
+    // returns), so this is a cosmetic delay between page creation and
+    // surfacing the link — gives the user the sense that careful work is
+    // happening on the Notion side. Block conversion, colours, and zebra
+    // rows have already been applied at this point.
+    function _showFormatInNotionModal(durationMs, onDone) {
+      const modal = document.getElementById('format-modal');
+      const fill = document.getElementById('format-modal-fill');
+      const pct = document.getElementById('format-modal-pct');
+      modal.style.display = 'flex';
+      // Reset from any previous run.
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+      pct.textContent = '0%';
+      // Force reflow before re-enabling the transition so the bar
+      // animates from 0 instead of snapping.
+      // eslint-disable-next-line no-unused-expressions
+      fill.offsetHeight;
+      fill.style.transition = 'width 1s linear';
+
+      const start = Date.now();
+      const tick = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const p = Math.min(100, (elapsed / durationMs) * 100);
+        fill.style.width = p + '%';
+        pct.textContent = Math.round(p) + '%';
+        if (elapsed >= durationMs) {
+          clearInterval(tick);
+          // Small pause at 100% so the user sees it land.
+          setTimeout(() => {
+            modal.style.display = 'none';
+            onDone();
+          }, 300);
+        }
+      }, 1000);
+    }
+
+    // Send to Notion — posts the raw audit markdown straight to
+    // /api/send-to-notion (no LLM format pass on the client; the markdown→
+    // Notion-blocks converter on the server handles heading colours, zebra
+    // rows, etc.). After the API returns the URL we show a 60-second
+    // "Formatting in Notion.." popup before revealing the link, so the
+    // user has a sense of the work being applied.
     async function sendToNotion() {
       const btn = document.getElementById('send-notion-btn');
       const beautifyBtn = document.getElementById('beautify-btn');
@@ -1959,121 +2221,89 @@
       if (createBtn) createBtn.disabled = true;
       if (mdBtn) mdBtn.disabled = true;
 
-      const FORMAT_TARGET_CHARS = 25000;
-      const FORMAT_PHASE_PCT = 85;
-      _setCreatePdfProgress(btn, 0, 'Formatting');
+      _setCreatePdfProgress(btn, 25, 'Sending');
 
-      const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
-      const useExtendedThinking = document.getElementById('enable-thinking').checked;
+      const { restaurantName, dateStr } = _resolveRestaurantMeta();
+      const auditMd = _sanitizeForNotion(lastAnalysisText || '');
 
+      if (!auditMd.trim()) {
+        setStatus('error', 'No audit content to send. Run an analysis first.');
+        btn.disabled = false;
+        if (beautifyBtn) beautifyBtn.disabled = false;
+        if (createBtn) createBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
+        btn.innerHTML = originalLabel;
+        return;
+      }
+
+      // Keep the button progress ring ticking up while we wait for the
+      // single backend call. The call itself is fast (~3–8s) — the
+      // visible delay for the user is the 60s popup that follows.
+      let lastPct = 25;
+      const tick = setInterval(() => {
+        const next = Math.min(95, lastPct + 4);
+        lastPct = next;
+        _setCreatePdfProgress(btn, next, 'Sending');
+      }, 500);
+
+      let sendRes;
       try {
-        // Step 1 — stream the Notion-tuned format pass.
-        const formatRes = await fetch('/api/format-notion', {
+        sendRes = await fetch('/api/send-to-notion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            auditText: lastAnalysisText || '',
-            location: location || undefined,
-            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
-            useExtendedThinking,
-          }),
+          body: JSON.stringify({ auditMd, restaurantName, dateStr }),
         });
+      } catch (e) {
+        clearInterval(tick);
+        setStatus('error', 'Send to Notion failed: ' + e.message);
+        btn.disabled = false;
+        if (beautifyBtn) beautifyBtn.disabled = false;
+        if (createBtn) createBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
+        btn.innerHTML = originalLabel;
+        return;
+      } finally {
+        clearInterval(tick);
+      }
 
-        if (!formatRes.ok) {
-          const err = await formatRes.json().catch(() => ({}));
-          throw new Error(err?.error || (formatRes.status + ' ' + formatRes.statusText));
-        }
+      const result = await sendRes.json().catch(() => ({}));
+      if (!sendRes.ok && sendRes.status !== 207) {
+        setStatus('error', 'Send to Notion failed: ' + (result?.error || (sendRes.status + ' ' + sendRes.statusText)));
+        btn.disabled = false;
+        if (beautifyBtn) beautifyBtn.disabled = false;
+        if (createBtn) createBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
+        btn.innerHTML = originalLabel;
+        return;
+      }
 
-        const reader = formatRes.body.getReader();
-        const decoder = new TextDecoder();
-        let formattedText = '';
-        let lastPctRendered = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const lines = decoder.decode(value).split('\n');
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-            try {
-              const obj = JSON.parse(data);
-              if (obj.type === 'content_block_delta' && obj.delta?.text) {
-                formattedText += obj.delta.text;
-              }
-            } catch (_) {}
-          }
-          const pct = Math.min(
-            FORMAT_PHASE_PCT,
-            Math.round((formattedText.length / FORMAT_TARGET_CHARS) * FORMAT_PHASE_PCT),
-          );
-          if (pct > lastPctRendered) {
-            lastPctRendered = pct;
-            _setCreatePdfProgress(btn, pct, 'Formatting');
-          }
-        }
+      _setCreatePdfProgress(btn, 100, 'Done');
 
-        if (!formattedText.trim()) {
-          throw new Error('Format pass returned empty output');
-        }
+      const pageUrl = result?.url;
+      const partial = sendRes.status === 207 ? ' (partial — some blocks failed to append)' : '';
 
-        // Step 2 — send the markdown to the Notion endpoint. Show a ticking
-        // bar while we wait, since this is a single non-streaming request.
-        _setCreatePdfProgress(btn, FORMAT_PHASE_PCT, 'Sending');
-        const tick = setInterval(() => {
-          const next = Math.min(98, lastPctRendered + 2);
-          lastPctRendered = next;
-          _setCreatePdfProgress(btn, next, 'Sending');
-        }, 600);
-
-        let sendRes;
-        try {
-          sendRes = await fetch('/api/send-to-notion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              auditMd: _sanitizeForNotion(formattedText),
-              restaurantName,
-              dateStr,
-            }),
-          });
-        } finally {
-          clearInterval(tick);
-        }
-
-        const result = await sendRes.json().catch(() => ({}));
-        if (!sendRes.ok && sendRes.status !== 207) {
-          throw new Error(result?.error || (sendRes.status + ' ' + sendRes.statusText));
-        }
-
-        _setCreatePdfProgress(btn, 100, 'Done');
-
-        const pageUrl = result?.url;
+      // Reveal the link only after the 60-second formatting popup completes.
+      const revealLink = () => {
         const resultEl = document.getElementById('notion-result');
         if (pageUrl) {
-          const partial = sendRes.status === 207
-            ? ' (partial — some blocks failed to append)'
-            : '';
-          // Prominent chip under the bottom-actions row.
           resultEl.innerHTML = `<a href="${pageUrl}" target="_blank" rel="noopener">` +
             `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` +
             `Open in Notion ↗</a>`;
           resultEl.style.display = 'flex';
-          setStatus('ok', `Notion page created${partial}.`);
+          setStatus('ok', `Notion page ready${partial}.`);
         } else {
           resultEl.style.display = 'none';
           resultEl.innerHTML = '';
           setStatus('ok', 'Notion page created.');
         }
-      } catch (e) {
-        setStatus('error', 'Send to Notion failed: ' + e.message);
-      } finally {
         btn.disabled = false;
         if (beautifyBtn) beautifyBtn.disabled = false;
         if (createBtn) createBtn.disabled = false;
         if (mdBtn) mdBtn.disabled = false;
-        setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
-      }
+        btn.innerHTML = originalLabel;
+      };
+
+      _showFormatInNotionModal(60000, revealLink);
     }
 
   </script>
