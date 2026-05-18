@@ -1034,7 +1034,11 @@
 
     <!-- Results -->
     <div id="results">
-      <section class="card">
+      <!-- Audit Summary KPI tiles — hidden for now. The new analyze prompt
+           doesn't emit the metrics JSON block this card was bound to, so
+           it would render empty. Kept in the DOM (display:none) so we can
+           restore it later without re-writing the HTML. -->
+      <section class="card" style="display:none">
         <div class="card-head">
           <div class="card-title">
             <span class="emoji">📊</span>
