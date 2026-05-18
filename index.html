@@ -768,6 +768,28 @@
     }
     .bottom-actions .btn { padding: 14px 28px; }
 
+    /* "Open in Notion" result chip — appears under the bottom-actions
+       row after Send to Notion succeeds. */
+    .notion-result {
+      margin-top: 12px;
+      display: flex; justify-content: center;
+    }
+    .notion-result a {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      background: rgba(46, 160, 67, 0.12);
+      border: 1px solid rgba(46, 160, 67, 0.45);
+      color: #4ade80;
+      border-radius: var(--radius-pill);
+      font: 600 13px 'DM Sans', sans-serif;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .notion-result a:hover {
+      background: rgba(46, 160, 67, 0.20);
+    }
+    .notion-result a:active { transform: scale(0.98); }
+
     /* Review status banner */
     .review-banner {
       margin-bottom: 1rem;
@@ -945,6 +967,7 @@
           Create PDF
         </button>
       </div>
+      <div class="notion-result" id="notion-result" style="display:none"></div>
     </div>
 
     <footer>
@@ -1176,6 +1199,8 @@
       document.getElementById('step2').style.display = 'none';
       document.getElementById('results').style.display = 'none';
       document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('notion-result').style.display = 'none';
+      document.getElementById('notion-result').innerHTML = '';
       document.getElementById('review-banner').style.display = 'none';
       document.getElementById('empty-hint').style.display = '';
     }
@@ -1391,6 +1416,8 @@
       document.getElementById('analysis-text').innerHTML = '';
       document.getElementById('metrics-grid').innerHTML = renderSkeletons();
       document.getElementById('bottom-actions').style.display = 'none';
+      document.getElementById('notion-result').style.display = 'none';
+      document.getElementById('notion-result').innerHTML = '';
       document.getElementById('review-banner').style.display = 'none';
       lastAnalysisText = ''; lastAnalysisHtml = ''; lastMetrics = null;
 
@@ -2022,13 +2049,20 @@
         _setCreatePdfProgress(btn, 100, 'Done');
 
         const pageUrl = result?.url;
+        const resultEl = document.getElementById('notion-result');
         if (pageUrl) {
           const partial = sendRes.status === 207
             ? ' (partial — some blocks failed to append)'
             : '';
-          setStatus('ok',
-            `Notion page created${partial}. <a href="${pageUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Open in Notion ↗</a>`);
+          // Prominent chip under the bottom-actions row.
+          resultEl.innerHTML = `<a href="${pageUrl}" target="_blank" rel="noopener">` +
+            `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` +
+            `Open in Notion ↗</a>`;
+          resultEl.style.display = 'flex';
+          setStatus('ok', `Notion page created${partial}.`);
         } else {
+          resultEl.style.display = 'none';
+          resultEl.innerHTML = '';
           setStatus('ok', 'Notion page created.');
         }
       } catch (e) {
