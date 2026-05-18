@@ -394,6 +394,12 @@
       box-shadow: 0 6px 28px rgba(0,0,0,0.35);
     }
     .btn-notion:hover { box-shadow: 0 8px 36px rgba(0,0,0,0.48); }
+    .btn-notion-send {
+      background: linear-gradient(135deg, #1d3557 0%, #2a4d80 100%);
+      color: #f5f5f5; border: none;
+      box-shadow: 0 6px 28px rgba(29,53,87,0.45);
+    }
+    .btn-notion-send:hover { box-shadow: 0 8px 36px rgba(29,53,87,0.60); }
 
     .btn-secondary {
       background: var(--pill);
@@ -929,6 +935,10 @@
         <button class="btn btn-notion" id="download-md-btn" onclick="downloadMarkdown()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download for Notion
+        </button>
+        <button class="btn btn-notion-send" id="send-notion-btn" onclick="sendToNotion()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Send to Notion
         </button>
         <button class="btn btn-primary" id="create-pdf-btn" onclick="createPDF()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
@@ -1595,10 +1605,12 @@
       const btn = document.getElementById('beautify-btn');
       const otherBtn = document.getElementById('create-pdf-btn');
       const mdBtn = document.getElementById('download-md-btn');
+      const sendBtn = document.getElementById('send-notion-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (otherBtn) otherBtn.disabled = true;
       if (mdBtn) mdBtn.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Beautifying…';
 
       const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
@@ -1635,6 +1647,7 @@
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
         if (mdBtn) mdBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         btn.innerHTML = originalLabel;
       }
     }
@@ -1671,10 +1684,12 @@
       const btn = document.getElementById('create-pdf-btn');
       const otherBtn = document.getElementById('beautify-btn');
       const mdBtn = document.getElementById('download-md-btn');
+      const sendBtn = document.getElementById('send-notion-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (otherBtn) otherBtn.disabled = true;
       if (mdBtn) mdBtn.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
 
       // Rough char-count estimate for progress mapping. The format pass on a
       // Cave-sized audit produces ~20–30K chars of Markdown. We cap the
@@ -1789,6 +1804,7 @@
         btn.disabled = false;
         if (otherBtn) otherBtn.disabled = false;
         if (mdBtn) mdBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         // Brief pause so the user sees the 100% completion before the button
         // reverts to its idle state.
         setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
@@ -1818,10 +1834,12 @@
       const btn = document.getElementById('download-md-btn');
       const beautifyBtn = document.getElementById('beautify-btn');
       const createBtn = document.getElementById('create-pdf-btn');
+      const sendBtn = document.getElementById('send-notion-btn');
       const originalLabel = btn.innerHTML;
       btn.disabled = true;
       if (beautifyBtn) beautifyBtn.disabled = true;
       if (createBtn) createBtn.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
 
       const FORMAT_TARGET_CHARS = 25000;
       _setCreatePdfProgress(btn, 0, 'Formatting');
@@ -1894,6 +1912,132 @@
         btn.disabled = false;
         if (beautifyBtn) beautifyBtn.disabled = false;
         if (createBtn) createBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
+        setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
+      }
+    }
+
+    // Send to Notion — runs the same Notion-tuned format pass that
+    // downloadMarkdown() uses, then POSTs the result to /api/send-to-notion
+    // which converts the markdown to Notion blocks and creates a new page
+    // under the configured parent. On success, surfaces the new page URL.
+    async function sendToNotion() {
+      const btn = document.getElementById('send-notion-btn');
+      const beautifyBtn = document.getElementById('beautify-btn');
+      const createBtn = document.getElementById('create-pdf-btn');
+      const mdBtn = document.getElementById('download-md-btn');
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      if (beautifyBtn) beautifyBtn.disabled = true;
+      if (createBtn) createBtn.disabled = true;
+      if (mdBtn) mdBtn.disabled = true;
+
+      const FORMAT_TARGET_CHARS = 25000;
+      const FORMAT_PHASE_PCT = 85;
+      _setCreatePdfProgress(btn, 0, 'Formatting');
+
+      const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
+      const useExtendedThinking = document.getElementById('enable-thinking').checked;
+
+      try {
+        // Step 1 — stream the Notion-tuned format pass.
+        const formatRes = await fetch('/api/format-notion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auditText: lastAnalysisText || '',
+            location: location || undefined,
+            supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
+            useExtendedThinking,
+          }),
+        });
+
+        if (!formatRes.ok) {
+          const err = await formatRes.json().catch(() => ({}));
+          throw new Error(err?.error || (formatRes.status + ' ' + formatRes.statusText));
+        }
+
+        const reader = formatRes.body.getReader();
+        const decoder = new TextDecoder();
+        let formattedText = '';
+        let lastPctRendered = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const lines = decoder.decode(value).split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const obj = JSON.parse(data);
+              if (obj.type === 'content_block_delta' && obj.delta?.text) {
+                formattedText += obj.delta.text;
+              }
+            } catch (_) {}
+          }
+          const pct = Math.min(
+            FORMAT_PHASE_PCT,
+            Math.round((formattedText.length / FORMAT_TARGET_CHARS) * FORMAT_PHASE_PCT),
+          );
+          if (pct > lastPctRendered) {
+            lastPctRendered = pct;
+            _setCreatePdfProgress(btn, pct, 'Formatting');
+          }
+        }
+
+        if (!formattedText.trim()) {
+          throw new Error('Format pass returned empty output');
+        }
+
+        // Step 2 — send the markdown to the Notion endpoint. Show a ticking
+        // bar while we wait, since this is a single non-streaming request.
+        _setCreatePdfProgress(btn, FORMAT_PHASE_PCT, 'Sending');
+        const tick = setInterval(() => {
+          const next = Math.min(98, lastPctRendered + 2);
+          lastPctRendered = next;
+          _setCreatePdfProgress(btn, next, 'Sending');
+        }, 600);
+
+        let sendRes;
+        try {
+          sendRes = await fetch('/api/send-to-notion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              auditMd: _sanitizeForNotion(formattedText),
+              restaurantName,
+              dateStr,
+            }),
+          });
+        } finally {
+          clearInterval(tick);
+        }
+
+        const result = await sendRes.json().catch(() => ({}));
+        if (!sendRes.ok && sendRes.status !== 207) {
+          throw new Error(result?.error || (sendRes.status + ' ' + sendRes.statusText));
+        }
+
+        _setCreatePdfProgress(btn, 100, 'Done');
+
+        const pageUrl = result?.url;
+        if (pageUrl) {
+          const partial = sendRes.status === 207
+            ? ' (partial — some blocks failed to append)'
+            : '';
+          setStatus('ok',
+            `Notion page created${partial}. <a href="${pageUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Open in Notion ↗</a>`);
+        } else {
+          setStatus('ok', 'Notion page created.');
+        }
+      } catch (e) {
+        setStatus('error', 'Send to Notion failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        if (beautifyBtn) beautifyBtn.disabled = false;
+        if (createBtn) createBtn.disabled = false;
+        if (mdBtn) mdBtn.disabled = false;
         setTimeout(() => { btn.innerHTML = originalLabel; }, 400);
       }
     }
