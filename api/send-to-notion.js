@@ -2,13 +2,19 @@ import { markdownToNotionBlocks } from '../lib/markdown-to-notion-blocks.js';
 
 export const config = { runtime: 'edge' };
 
-// Creates a new Notion page under the configured parent page, containing
-// the audit markdown converted to Notion blocks. Triggered by the
-// "Send to Notion" button on the tool.
+// Creates a new Notion page containing the audit markdown converted to
+// Notion blocks. Triggered by the "Send to Notion" button on the tool.
+//
+// The configured parent ID can be EITHER a regular page (each audit
+// becomes a sub-page) OR a database (each audit becomes a new row at the
+// top of the database). The endpoint auto-detects which it is and adapts
+// the create-page request accordingly.
 //
 // Required env vars (set on Vercel):
 //   NOTION_TOKEN            - internal-integration secret (ntn_… / secret_…)
-//   NOTION_PARENT_PAGE_ID   - 32-char hex ID of the parent page (dashes OK)
+//   NOTION_PARENT_PAGE_ID   - 32-char hex ID of the parent page OR database
+//                             (env var name kept as PAGE_ID for backward
+//                             compat with the original page-only version)
 //
 // Request body: { auditMd, restaurantName?, dateStr? }
 // Response:     { url } on success, { error } on failure.
@@ -16,6 +22,42 @@ export const config = { runtime: 'edge' };
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 const CHILDREN_PER_REQUEST = 100; // Notion's hard cap per call
+
+// Look up the parent ID in Notion, figure out whether it's a database or
+// a page, and (for databases) find the name of the title property —
+// which varies per database and is required when creating a row.
+async function detectParent(token, parentId) {
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Notion-Version': NOTION_VERSION,
+  };
+  // Try database first — it's the more common "collection of audits" UX.
+  const dbRes = await fetch(`${NOTION_API}/databases/${parentId}`, { headers });
+  if (dbRes.ok) {
+    const db = await dbRes.json();
+    let titleProp = null;
+    for (const [name, def] of Object.entries(db.properties || {})) {
+      if (def?.type === 'title') { titleProp = name; break; }
+    }
+    if (!titleProp) {
+      return { error: 'Database has no title property — cannot create rows in it.' };
+    }
+    return { type: 'database_id', titleProp };
+  }
+  // Fall back to page lookup.
+  const pageRes = await fetch(`${NOTION_API}/pages/${parentId}`, { headers });
+  if (pageRes.ok) {
+    return { type: 'page_id' };
+  }
+  // Neither worked — give the user something actionable.
+  let detail;
+  try { detail = await dbRes.text(); } catch { detail = ''; }
+  return {
+    error: `Parent ID ${parentId} is not accessible as a page or a database. ` +
+           `Confirm the integration is added to that object's Connections (Notion ⋯ menu → Connections). ` +
+           `Notion said: ${detail.slice(0, 200)}`,
+  };
+}
 
 function jsonError(status, msg) {
   return new Response(JSON.stringify({ error: msg }), {
@@ -60,6 +102,19 @@ export default async function handler(req) {
     'Content-Type': 'application/json',
   };
 
+  // Figure out whether the configured parent is a page or a database, so
+  // we know which `parent.*_id` field to set and which property holds the
+  // page title (databases name the title property arbitrarily).
+  const parentInfo = await detectParent(token, parentId);
+  if (parentInfo.error) return jsonError(404, parentInfo.error);
+
+  const parent = parentInfo.type === 'database_id'
+    ? { database_id: parentId }
+    : { page_id: parentId };
+  const titlePropName = parentInfo.type === 'database_id'
+    ? parentInfo.titleProp
+    : 'title';
+
   // Create the page with the first chunk of children. The rest get
   // appended via PATCH /v1/blocks/{id}/children below.
   const firstChunk = blocks.slice(0, CHILDREN_PER_REQUEST);
@@ -69,9 +124,9 @@ export default async function handler(req) {
     method: 'POST',
     headers: notionHeaders,
     body: JSON.stringify({
-      parent: { page_id: parentId },
+      parent,
       properties: {
-        title: { title: [{ type: 'text', text: { content: title } }] },
+        [titlePropName]: { title: [{ type: 'text', text: { content: title } }] },
       },
       children: firstChunk,
     }),
