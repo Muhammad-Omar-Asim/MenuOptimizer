@@ -2,7 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL } from '../lib/anthropic-config.js';
+import { MODEL, pickModel } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -87,8 +87,11 @@ export default async function handler(req) {
     ? (enableWebSearch ? 32000 : 40000)
     : (enableWebSearch ? 24000 : 32000);
 
+  // UI test toggle: when true, swap to Sonnet for this single run so the
+  // user can compare cost/quality without changing the default.
+  const useSonnet = body?.useSonnet === true;
   const payload = {
-    model: MODEL,
+    model: pickModel(useSonnet),
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),

@@ -2,7 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
-import { MODEL } from '../lib/anthropic-config.js';
+import { MODEL, pickModel } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -67,8 +67,9 @@ export default async function handler(req) {
     ? (webSearchOn ? 32000 : 40000)
     : (webSearchOn ? 24000 : 32000);
 
+  const useSonnet = body?.useSonnet === true;
   return json({
-    model: MODEL,
+    model: pickModel(useSonnet),
     max_tokens: maxTokens,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,

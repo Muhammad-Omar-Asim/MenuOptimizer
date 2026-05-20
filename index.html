@@ -1003,6 +1003,17 @@
       </div>
 
       <div class="field-block">
+        <label class="toggle-row" for="use-sonnet">
+          <input type="checkbox" id="use-sonnet" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">
+            <span class="toggle-title">Test with Sonnet (5× cheaper)</span>
+            <span class="toggle-desc">Run this audit on Claude Sonnet instead of Opus for cost / quality comparison. Off by default — production runs use Opus. Applies to every LLM call this run: analyze, confirmatory check, format passes.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="field-block">
         <label class="toggle-row" for="enable-review">
           <input type="checkbox" id="enable-review" checked />
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -1192,6 +1203,7 @@
 
       const location = (document.getElementById('location-input')?.value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking')?.checked !== false;
+      const useSonnet = document.getElementById('use-sonnet')?.checked === true;
       // The View Prompts modal previews whichever mode would actually run:
       // basic when there are no reports attached, full otherwise.
       const mode = supportingReports.length === 0 ? 'basic' : 'full';
@@ -1201,6 +1213,7 @@
         supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
         firstPassAudit: lastAnalysisText || undefined,
         useExtendedThinking,
+        useSonnet,
         mode,
       };
 
@@ -1570,6 +1583,7 @@
 
       const location = (document.getElementById('location-input').value || '').trim();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
+      const useSonnet = document.getElementById('use-sonnet')?.checked === true;
 
       try {
         const ok = await streamAudit('/api/analyze', {
@@ -1577,6 +1591,7 @@
           location: location || undefined,
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           useExtendedThinking,
+          useSonnet,
           mode,
         });
         if (!ok) { resetBtn(); return; }
@@ -1613,6 +1628,7 @@
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           firstPassAudit: firstPassText,
           useExtendedThinking,
+          useSonnet,
         });
 
         if (reviewed) {
@@ -1995,6 +2011,7 @@
 
       const { restaurantName, location, dateStr } = _resolveRestaurantMeta();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
+      const useSonnet = document.getElementById('use-sonnet')?.checked === true;
 
       try {
         // Step 1 — stream the format pass.
@@ -2006,6 +2023,7 @@
             location: location || undefined,
             supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
             useExtendedThinking,
+            useSonnet,
           }),
         });
 
@@ -2139,6 +2157,7 @@
 
       const { restaurantName, location } = _resolveRestaurantMeta();
       const useExtendedThinking = document.getElementById('enable-thinking').checked;
+      const useSonnet = document.getElementById('use-sonnet')?.checked === true;
 
       try {
         const formatRes = await fetch('/api/format-notion', {
@@ -2149,6 +2168,7 @@
             location: location || undefined,
             supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
             useExtendedThinking,
+            useSonnet,
           }),
         });
 
