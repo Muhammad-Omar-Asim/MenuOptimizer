@@ -1,6 +1,6 @@
 import { buildFormatNotionPrompt } from '../lib/prompts/format-notion-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL } from '../lib/anthropic-config.js';
+import { MODEL, pickModel } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -50,8 +50,9 @@ export default async function handler(req) {
   // is the same length-ish as the PDF deliverable.
   const maxTokens = useExtendedThinking ? 40000 : 32000;
 
+  const useSonnet = body?.useSonnet === true;
   const payload = {
-    model: MODEL,
+    model: pickModel(useSonnet),
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),

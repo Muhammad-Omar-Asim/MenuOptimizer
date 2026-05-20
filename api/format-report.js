@@ -1,6 +1,6 @@
 import { buildFormatReportPrompt } from '../lib/prompts/format-report-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL } from '../lib/anthropic-config.js';
+import { MODEL, pickModel } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -49,8 +49,9 @@ export default async function handler(req) {
   // sub-sectioning and convert prose into tables without hitting the cap.
   const maxTokens = useExtendedThinking ? 40000 : 32000;
 
+  const useSonnet = body?.useSonnet === true;
   const payload = {
-    model: MODEL,
+    model: pickModel(useSonnet),
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),
