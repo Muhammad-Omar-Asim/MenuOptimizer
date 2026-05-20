@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Menu Analyzer · Flipdish</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Flipdish brandbook calls for Clarendon Text Pro (display) + Roboto (body).
+       Clarendon isn't free-to-host, so we use Domine — the Google-fonts fallback
+       the brandbook specifies for G-Suite use. Nunito Black is the closest free
+       approximation to the Flipdish wordmark for the text-only placeholder
+       until the official SVG lands in /assets. -->
+  <link href="https://fonts.googleapis.com/css2?family=Domine:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Nunito:wght@400;700;900&family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
@@ -23,34 +28,59 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Flipdish brand palette (from the brandbook, March 2023).
+       Primary:   Black / White / Flippy Blue (#0B75D7)
+       Core:      Freezer Burn / Spicy Carrot / Pebble
+       Secondary: Donut Panic / Electric Lime (sparingly, data-viz only)
+
+       The legacy variable names (--cyan, --purple, --pink, --rose) are kept
+       so the rest of the stylesheet doesn't need to be rewritten — each one
+       now maps to the closest Flipdish equivalent. The brandbook colours
+       are also exposed under their proper names for new rules. */
     :root {
-      --bg: #f7f8fb;
-      --bg-2: #eef0f6;
+      /* Flipdish primary */
+      --flippy-blue: #0B75D7;
+      --flippy-blue-dark: #095BAA;
+      --flippy-blue-soft: rgba(11,117,215,0.10);
+      --flippy-blue-edge: rgba(11,117,215,0.30);
+      /* Flipdish core */
+      --freezer-burn: #A5E2F6;
+      --spicy-carrot: #F7742B;
+      --pebble: #EEEBE9;
+      /* Flipdish secondary */
+      --donut-panic: #FFBAE4;
+      --electric-lime: #CFF27D;
+
+      --bg: #ffffff;
+      --bg-2: var(--pebble);
       --surface: #ffffff;
       --surface-solid: #ffffff;
-      --pill: #f1f3f8;
-      --pill-hover: #e6e9f1;
+      --pill: var(--pebble);
+      --pill-hover: #e2dfdd;
       --border: rgba(15,23,42,0.10);
       --border-strong: rgba(15,23,42,0.18);
-      --text: #0f172a;
+      --text: #000000;
       --text-2: #475569;
       --text-3: #94a3b8;
-      --cyan: #0891b2;
-      --purple: #7c3aed;
-      --pink: #db2777;
-      --mint: #059669;
-      --rose: #e11d48;
-      --amber: #d97706;
-      --primary-gradient: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 50%, #f9a8d4 100%);
-      --panel-gradient: linear-gradient(135deg, rgba(125,211,252,0.16) 0%, rgba(167,139,250,0.20) 45%, rgba(249,168,212,0.10) 75%, rgba(255,255,255,0) 100%);
+
+      /* Legacy aliases — preserved so existing CSS rules keep working. */
+      --cyan:   var(--freezer-burn);
+      --purple: var(--flippy-blue);
+      --pink:   var(--spicy-carrot);
+      --mint:   #059669;
+      --rose:   var(--spicy-carrot);
+      --amber:  var(--spicy-carrot);
+
+      --primary-gradient: linear-gradient(135deg, var(--flippy-blue) 0%, var(--flippy-blue-dark) 100%);
+      --panel-gradient:   linear-gradient(135deg, rgba(11,117,215,0.06) 0%, rgba(165,226,246,0.08) 60%, rgba(255,255,255,0) 100%);
       --sub-bg: rgba(15,23,42,0.03);
-      --hint-bg: rgba(125,211,252,0.06);
-      --hint-icon-bg: rgba(125,211,252,0.15);
-      --hint-icon-border: rgba(125,211,252,0.45);
-      --code-bg: rgba(124,58,237,0.10);
-      --code-color: var(--purple);
+      --hint-bg: var(--flippy-blue-soft);
+      --hint-icon-bg: rgba(11,117,215,0.15);
+      --hint-icon-border: var(--flippy-blue-edge);
+      --code-bg: var(--flippy-blue-soft);
+      --code-color: var(--flippy-blue);
       --table-bg: #ffffff;
-      --table-zebra-bg: rgba(125,211,252,0.04);
+      --table-zebra-bg: var(--pebble);
       --shimmer-1: rgba(15,23,42,0.05);
       --shimmer-2: rgba(15,23,42,0.10);
       --chip-x-bg: rgba(15,23,42,0.06);
@@ -60,30 +90,32 @@
     }
 
     :root[data-theme="dark"] {
-      --bg: #07090f;
-      --bg-2: #0c0f1a;
-      --surface: #11152099;
-      --surface-solid: #131726;
-      --pill: #1a1f2e;
-      --pill-hover: #232839;
+      --bg: #000000;
+      --bg-2: #0a0a0a;
+      --surface: rgba(20,20,20,0.92);
+      --surface-solid: #131313;
+      --pill: #1a1a1a;
+      --pill-hover: #232323;
       --border: rgba(255,255,255,0.08);
       --border-strong: rgba(255,255,255,0.14);
       --text: #ffffff;
       --text-2: #b5b7c9;
       --text-3: #6b7088;
-      --cyan: #7dd3fc;
-      --purple: #a78bfa;
-      --pink: #f9a8d4;
-      --mint: #34d399;
-      --rose: #fb7185;
-      --amber: #fbbf24;
-      --panel-gradient: linear-gradient(135deg, rgba(45,212,191,0.18) 0%, rgba(167,139,250,0.22) 45%, rgba(249,168,212,0.10) 75%, rgba(15,19,32,0) 100%);
+
+      --cyan:   var(--freezer-burn);
+      --purple: var(--flippy-blue);
+      --pink:   var(--spicy-carrot);
+      --mint:   #34d399;
+      --rose:   var(--spicy-carrot);
+      --amber:  var(--spicy-carrot);
+
+      --panel-gradient: linear-gradient(135deg, rgba(11,117,215,0.16) 0%, rgba(165,226,246,0.10) 60%, rgba(0,0,0,0) 100%);
       --sub-bg: rgba(0,0,0,0.32);
       --hint-bg: rgba(255,255,255,0.02);
-      --hint-icon-bg: rgba(125,211,252,0.10);
-      --hint-icon-border: rgba(125,211,252,0.30);
+      --hint-icon-bg: rgba(11,117,215,0.18);
+      --hint-icon-border: rgba(11,117,215,0.45);
       --code-bg: rgba(255,255,255,0.06);
-      --code-color: var(--cyan);
+      --code-color: var(--freezer-burn);
       --table-bg: rgba(255,255,255,0.02);
       --table-zebra-bg: transparent;
       --shimmer-1: rgba(255,255,255,0.04);
@@ -92,11 +124,10 @@
     }
 
     body {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       background:
-        radial-gradient(1100px 600px at 88% -8%, rgba(167,139,250,0.22), transparent 60%),
-        radial-gradient(900px 500px at 5% 0%, rgba(125,211,252,0.20), transparent 60%),
-        radial-gradient(700px 500px at 50% 110%, rgba(249,168,212,0.14), transparent 70%),
+        radial-gradient(1100px 600px at 88% -8%, rgba(11,117,215,0.10), transparent 60%),
+        radial-gradient(900px 500px at 5% 0%, rgba(165,226,246,0.20), transparent 60%),
         var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -104,30 +135,62 @@
       padding-bottom: 4rem;
     }
 
+    /* Flipdish display type. Domine is the brand-approved Google-fonts
+       fallback for Clarendon Text Pro. Used for the wordmark, big section
+       titles, and italic-blue emphasis spans. */
+    .display, h1.display, h2.display {
+      font-family: 'Domine', 'Times New Roman', serif;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+    }
+    .accent {
+      font-family: 'Domine', 'Times New Roman', serif;
+      font-style: italic;
+      color: var(--flippy-blue);
+    }
+
     .hero {
       max-width: 1080px; margin: 0 auto;
       padding: 1.75rem 1.5rem 1rem;
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: center; gap: 14px;
     }
-    .brand-mark {
-      width: 36px; height: 36px;
-      border-radius: 10px;
-      background: var(--primary-gradient);
-      display: grid; place-items: center;
-      color: #0b0d18; font-weight: 800; font-size: 16px;
-      box-shadow: 0 6px 24px rgba(125,211,252,0.30);
+    /* Flipdish wordmark — text-only placeholder. Drop the official
+       SVG into /assets/flipdish-wordmark.svg and swap the contents of
+       <a class="brand-wordmark"> with <img src="..."> when ready. */
+    .brand-wordmark {
+      font-family: 'Nunito', 'Helvetica Neue', sans-serif;
+      font-weight: 900;
+      font-size: 26px;
+      letter-spacing: -0.045em;
+      color: var(--text);
+      text-decoration: none;
+      line-height: 1;
+    }
+    .brand-divider {
+      width: 1px; height: 22px;
+      background: var(--border-strong);
+      flex-shrink: 0;
     }
     .brand-name {
-      font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+      font-family: 'Domine', 'Times New Roman', serif;
+      font-size: 17px; font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .brand-name em {
+      font-style: italic;
+      color: var(--flippy-blue);
     }
     .brand-pill {
       margin-left: auto;
       font-size: 11px; padding: 5px 12px;
-      background: rgba(167,139,250,0.14);
-      color: var(--purple);
-      border: 1px solid rgba(167,139,250,0.30);
+      background: var(--flippy-blue-soft);
+      color: var(--flippy-blue);
+      border: 1px solid var(--flippy-blue-edge);
       border-radius: var(--radius-pill);
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
 
     .page {
@@ -153,7 +216,7 @@
     .card::after {
       content: ''; position: absolute; inset: 0;
       border-radius: inherit; padding: 1px;
-      background: linear-gradient(135deg, rgba(125,211,252,0.30), rgba(167,139,250,0.30) 50%, rgba(249,168,212,0.10) 100%);
+      background: linear-gradient(135deg, rgba(11,117,215,0.30), rgba(165,226,246,0.24) 60%, rgba(238,235,233,0.20) 100%);
       -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
               mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
       -webkit-mask-composite: xor;
@@ -183,7 +246,7 @@
     }
     .drop-zone.dragging {
       border-color: var(--cyan);
-      background: rgba(125,211,252,0.10);
+      background: rgba(165,226,246,0.10);
     }
     .drop-zone.has-file {
       border-style: solid;
@@ -198,7 +261,7 @@
       color: var(--text);
       border: 1px solid var(--border-strong);
       border-radius: var(--radius-pill);
-      font: 600 13.5px 'DM Sans', sans-serif;
+      font: 600 13.5px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       cursor: pointer;
       transition: background 0.2s, transform 0.1s;
     }
@@ -225,7 +288,7 @@
 
     .status-line {
       margin-top: 14px;
-      font-family: 'DM Mono', monospace;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
       font-size: 12.5px;
       color: var(--mint);
       display: flex; align-items: center; gap: 8px;
@@ -256,14 +319,14 @@
       color: var(--text);
       border-radius: var(--radius-sm);
       padding: 12px 14px;
-      font: 14px 'DM Sans', sans-serif;
+      font: 14px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
     .text-input::placeholder { color: var(--text-3); }
     .text-input:focus {
       border-color: var(--purple);
-      box-shadow: 0 0 0 3px rgba(167,139,250,0.18);
+      box-shadow: 0 0 0 3px rgba(11,117,215,0.18);
     }
 
     .field-block { margin-bottom: 1.25rem; }
@@ -278,7 +341,7 @@
       transition: background 0.2s, border-color 0.2s;
     }
     .reports-zone.dragging {
-      border-color: var(--cyan); background: rgba(125,211,252,0.10);
+      border-color: var(--cyan); background: rgba(165,226,246,0.10);
     }
     .reports-hint { font-size: 13px; color: var(--text-3); }
 
@@ -288,8 +351,8 @@
     }
     .report-chip {
       display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(167,139,250,0.10);
-      border: 1px solid rgba(167,139,250,0.28);
+      background: rgba(11,117,215,0.10);
+      border: 1px solid rgba(11,117,215,0.28);
       color: var(--text);
       border-radius: var(--radius-pill);
       padding: 6px 6px 6px 12px;
@@ -348,7 +411,7 @@
       background: #0b0d18;
     }
     .toggle-row input[type="checkbox"]:focus-visible ~ .toggle-track {
-      box-shadow: 0 0 0 3px rgba(167,139,250,0.30);
+      box-shadow: 0 0 0 3px rgba(11,117,215,0.30);
     }
     .toggle-text {
       display: flex; flex-direction: column; gap: 2px;
@@ -365,7 +428,7 @@
       border: 1px solid var(--border-strong);
       color: var(--text);
       border-radius: var(--radius-pill);
-      font: 600 14px 'DM Sans', sans-serif;
+      font: 600 14px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       cursor: pointer;
       transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
     }
@@ -374,20 +437,20 @@
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
     .btn-primary {
       background: var(--primary-gradient);
-      color: #0b0d18; border: none;
-      box-shadow: 0 6px 28px rgba(167,139,250,0.35);
+      color: #ffffff; border: none;
+      box-shadow: 0 6px 28px rgba(11,117,215,0.35);
     }
-    .btn-primary:hover { box-shadow: 0 8px 36px rgba(167,139,250,0.5); }
+    .btn-primary:hover { box-shadow: 0 8px 36px rgba(11,117,215,0.50); }
     .btn-outline-pink {
-      border-color: rgba(249,168,212,0.45);
-      color: var(--pink);
+      border-color: var(--flippy-blue-edge);
+      color: var(--flippy-blue);
     }
     .btn-beautify {
-      background: linear-gradient(135deg, #a78bfa 0%, #f9a8d4 55%, #fdba74 100%);
-      color: #0b0d18; border: none;
-      box-shadow: 0 6px 28px rgba(249,168,212,0.40);
+      background: linear-gradient(135deg, var(--flippy-blue) 0%, var(--freezer-burn) 100%);
+      color: #ffffff; border: none;
+      box-shadow: 0 6px 28px rgba(11,117,215,0.35);
     }
-    .btn-beautify:hover { box-shadow: 0 8px 36px rgba(249,168,212,0.55); }
+    .btn-beautify:hover { box-shadow: 0 8px 36px rgba(11,117,215,0.50); }
     .btn-notion {
       background: linear-gradient(135deg, #2b2b2b 0%, #4a4a4a 100%);
       color: #f5f5f5; border: none;
@@ -395,11 +458,11 @@
     }
     .btn-notion:hover { box-shadow: 0 8px 36px rgba(0,0,0,0.48); }
     .btn-notion-send {
-      background: linear-gradient(135deg, #1d3557 0%, #2a4d80 100%);
-      color: #f5f5f5; border: none;
-      box-shadow: 0 6px 28px rgba(29,53,87,0.45);
+      background: linear-gradient(135deg, var(--flippy-blue) 0%, var(--flippy-blue-dark) 100%);
+      color: #ffffff; border: none;
+      box-shadow: 0 6px 28px rgba(11,117,215,0.45);
     }
-    .btn-notion-send:hover { box-shadow: 0 8px 36px rgba(29,53,87,0.60); }
+    .btn-notion-send:hover { box-shadow: 0 8px 36px rgba(11,117,215,0.60); }
 
     .btn-secondary {
       background: var(--pill);
@@ -450,7 +513,7 @@
     }
     .progress-ring .pr-fill {
       fill: none;
-      stroke: #0b0d18;
+      stroke: #ffffff;
       stroke-width: 3;
       stroke-linecap: round;
       stroke-dasharray: 56.5487;       /* 2 * π * 9 */
@@ -462,7 +525,7 @@
       inset: 0;
       display: flex; align-items: center; justify-content: center;
       font-size: 8.5px; font-weight: 700;
-      color: #0b0d18;
+      color: #ffffff;
       line-height: 1;
     }
     .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
@@ -514,17 +577,17 @@
       font-size: 28px; font-weight: 700; color: var(--text);
       letter-spacing: -0.025em;
     }
-    .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.22); color: var(--cyan); }
-    .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.22); color: var(--purple); }
+    .metric.m-cyan   .icon-bubble { background: rgba(165,226,246,0.22); color: var(--cyan); }
+    .metric.m-purple .icon-bubble { background: rgba(11,117,215,0.22); color: var(--purple); }
     .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.20);  color: var(--mint); }
     .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.22);  color: var(--amber); }
-    .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.30); color: var(--pink); }
+    .metric.m-pink   .icon-bubble { background: rgba(247,116,43,0.30); color: var(--pink); }
 
-    [data-theme="dark"] .metric.m-cyan   .icon-bubble { background: rgba(125,211,252,0.12); }
-    [data-theme="dark"] .metric.m-purple .icon-bubble { background: rgba(167,139,250,0.14); }
+    [data-theme="dark"] .metric.m-cyan   .icon-bubble { background: rgba(165,226,246,0.12); }
+    [data-theme="dark"] .metric.m-purple .icon-bubble { background: rgba(11,117,215,0.14); }
     [data-theme="dark"] .metric.m-mint   .icon-bubble { background: rgba(52,211,153,0.12); }
     [data-theme="dark"] .metric.m-amber  .icon-bubble { background: rgba(251,191,36,0.12); }
-    [data-theme="dark"] .metric.m-pink   .icon-bubble { background: rgba(249,168,212,0.14); }
+    [data-theme="dark"] .metric.m-pink   .icon-bubble { background: rgba(247,116,43,0.14); }
 
     /* Theme toggle button */
     .theme-toggle {
@@ -578,7 +641,7 @@
     .analysis-output code {
       background: var(--code-bg);
       padding: 1px 6px; border-radius: 4px;
-      font: 12.5px 'DM Mono', monospace;
+      font: 12.5px ui-monospace, Menlo, Consolas, monospace;
       color: var(--code-color);
     }
     .analysis-output table {
@@ -591,7 +654,7 @@
       border: 1px solid var(--border);
     }
     .analysis-output th {
-      background: rgba(167,139,250,0.18);
+      background: rgba(11,117,215,0.18);
       color: var(--text); text-align: left;
       padding: 9px 12px; font-weight: 700;
       border-bottom: 1px solid var(--border-strong);
@@ -607,8 +670,8 @@
 
     .spinner {
       width: 14px; height: 14px;
-      border: 2px solid rgba(11,13,24,0.25);
-      border-top-color: #0b0d18;
+      border: 2px solid rgba(255,255,255,0.30);
+      border-top-color: #ffffff;
       border-radius: 50%;
       animation: spin 0.65s linear infinite;
     }
@@ -686,7 +749,7 @@
       display: flex; align-items: center; gap: 10px;
     }
     .modal-head .stats {
-      font: 11.5px 'DM Mono', monospace;
+      font: 11.5px ui-monospace, Menlo, Consolas, monospace;
       color: var(--text-3);
       text-align: right;
     }
@@ -708,7 +771,7 @@
       padding: 8px 14px;
       border: none; background: transparent;
       color: var(--text-3);
-      font: 600 13px 'DM Sans', sans-serif;
+      font: 600 13px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s;
@@ -724,14 +787,14 @@
     .pane-toolbar {
       display: flex; justify-content: space-between; align-items: center;
       gap: 10px; margin-bottom: 10px;
-      font: 12px 'DM Mono', monospace;
+      font: 12px ui-monospace, Menlo, Consolas, monospace;
       color: var(--text-3);
     }
     .pane-toolbar .copy-btn {
       padding: 6px 12px;
       background: var(--pill); border: 1px solid var(--border);
       color: var(--text); border-radius: var(--radius-pill);
-      font: 600 12px 'DM Sans', sans-serif;
+      font: 600 12px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
     }
@@ -742,7 +805,7 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       padding: 14px 16px;
-      font: 12.5px/1.65 'DM Mono', monospace;
+      font: 12.5px/1.65 ui-monospace, Menlo, Consolas, monospace;
       color: var(--text);
       white-space: pre-wrap;
       word-break: break-word;
@@ -774,7 +837,7 @@
     }
     .analysis-progress-fill {
       height: 100%; width: 0%;
-      background: linear-gradient(90deg, #a78bfa 0%, #f9a8d4 100%);
+      background: linear-gradient(90deg, var(--flippy-blue) 0%, var(--flippy-blue-dark) 100%);
       transition: width 0.4s ease-out;
       border-radius: 4px;
     }
@@ -844,7 +907,7 @@
       box-shadow: 0 30px 80px rgba(0,0,0,0.5);
     }
     .format-modal-title {
-      font: 600 17px 'DM Sans', sans-serif;
+      font: 600 17px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       color: var(--text);
       margin-bottom: 22px;
     }
@@ -856,7 +919,7 @@
     }
     .format-modal-fill {
       height: 100%; width: 0%;
-      background: linear-gradient(90deg, #a78bfa 0%, #f9a8d4 100%);
+      background: linear-gradient(90deg, var(--flippy-blue) 0%, var(--flippy-blue-dark) 100%);
       transition: width 1s linear;
     }
     .format-modal-pct {
@@ -893,7 +956,7 @@
       border: 1px solid rgba(46, 160, 67, 0.45);
       color: #4ade80;
       border-radius: var(--radius-pill);
-      font: 600 13px 'DM Sans', sans-serif;
+      font: 600 13px 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       text-decoration: none;
       transition: background 0.15s, transform 0.1s;
     }
@@ -908,7 +971,7 @@
       padding: 12px 16px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border);
-      background: rgba(167,139,250,0.08);
+      background: rgba(11,117,215,0.08);
       font-size: 13px; color: var(--text-2);
       display: flex; align-items: center; gap: 10px;
     }
@@ -922,9 +985,13 @@
 <body>
 
   <header class="hero">
-    <div class="brand-mark">M</div>
-    <div class="brand-name">Menu Analyzer</div>
-    <span class="brand-pill">Flipdish · beta</span>
+    <!-- Wordmark — text placeholder until the official SVG lands in /assets.
+         When the file's in place, replace this <span> with:
+         <img src="assets/flipdish-wordmark.svg" alt="flipdish" class="brand-wordmark" /> -->
+    <span class="brand-wordmark">flipdish</span>
+    <div class="brand-divider" aria-hidden="true"></div>
+    <div class="brand-name">Menu <em>Analyzer</em></div>
+    <span class="brand-pill">Beta</span>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle dark/light theme" onclick="toggleTheme()">
       <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
