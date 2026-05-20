@@ -1094,7 +1094,10 @@
       </section>
 
       <div class="bottom-actions" id="bottom-actions" style="display:none">
-        <button class="btn btn-beautify" id="beautify-btn" onclick="downloadPDF('beautify')">
+        <!-- Beautify PDF — hidden for now. Kept in the DOM (display:none) so
+             the JS that disables it during other actions still finds the
+             element. To re-enable, remove the inline display:none. -->
+        <button class="btn btn-beautify" id="beautify-btn" onclick="downloadPDF('beautify')" style="display:none">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M5 12H2M22 12h-3M4.5 4.5l2 2M17.5 17.5l2 2M4.5 19.5l2-2M17.5 6.5l2-2"/><circle cx="12" cy="12" r="4"/></svg>
           Beautify PDF
         </button>
@@ -1106,7 +1109,10 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           Send to Notion
         </button>
-        <button class="btn btn-primary" id="create-pdf-btn" onclick="createPDF()">
+        <!-- Create PDF — hidden for now. Kept in the DOM (display:none) so
+             the JS that disables it during other actions still finds the
+             element. To re-enable, remove the inline display:none. -->
+        <button class="btn btn-primary" id="create-pdf-btn" onclick="createPDF()" style="display:none">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
           Create PDF
         </button>
