@@ -10,7 +10,8 @@ export const config = { runtime: 'edge' };
 // first-pass output supplied as reference, so the model can verify the
 // figures, fill gaps, and tighten language rather than starting blind.
 
-const MAX_MENU_CHARS = 550_000;
+// See api/analyze.js for the rationale on this value. Kept in sync.
+const MAX_MENU_CHARS = 2_000_000;
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -60,7 +61,7 @@ export default async function handler(req) {
   const menuJson = JSON.stringify(slim, null, 2);
   if (menuJson.length > MAX_MENU_CHARS) {
     return new Response(JSON.stringify({
-      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, exceeds ${(MAX_MENU_CHARS / 1000)}KB budget.`,
+      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, exceeds the ${(MAX_MENU_CHARS / 1000)}KB server-side budget. Menus this large will also exceed Anthropic's 200K-token context window — split the menu or switch to a long-context model variant.`,
     }), { status: 413, headers: { 'Content-Type': 'application/json' } });
   }
 
