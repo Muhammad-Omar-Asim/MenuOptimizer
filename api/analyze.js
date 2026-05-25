@@ -6,7 +6,16 @@ import { MODEL, pickModel } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
-const MAX_MENU_CHARS = 550_000; // ~135K tokens — leaves room for reports, prompt, output
+// Slimmed-menu size budget. ~2MB ≈ ~525K input tokens.
+//
+// Note: Anthropic's standard models have a 200K-token context window. A
+// menu near this 2MB cap will overflow that window and Anthropic will
+// reject the request upstream with "prompt is too long". This budget is
+// just our own guardrail — picking a generous value here lets the
+// Anthropic API surface the more specific error when it happens, rather
+// than us pre-rejecting menus that might fit (e.g. on a 1M-context
+// model variant).
+const MAX_MENU_CHARS = 2_000_000;
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -55,7 +64,9 @@ export default async function handler(req) {
 
   if (menuJson.length > MAX_MENU_CHARS) {
     return new Response(JSON.stringify({
-      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, which exceeds the ${(MAX_MENU_CHARS / 1000)}KB budget. Try removing base64 image data or splitting the menu into sections.`
+      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, which exceeds the ${(MAX_MENU_CHARS / 1000)}KB server-side budget. ` +
+             `Try removing base64 image data or splitting the menu into sections. ` +
+             `Note: even within this budget, menus larger than ~700KB may still be rejected by Anthropic if they exceed the model's 200K-token context window.`
     }), { status: 413, headers: { 'Content-Type': 'application/json' } });
   }
 
