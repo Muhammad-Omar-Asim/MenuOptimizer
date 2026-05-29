@@ -2,7 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL, pickModel } from '../lib/anthropic-config.js';
+import { MODEL, pickModelForRun } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -101,8 +101,13 @@ export default async function handler(req) {
   // UI test toggle: when true, swap to Sonnet for this single run so the
   // user can compare cost/quality without changing the default.
   const useSonnet = body?.useSonnet === true;
+  // Auto-promote to the 1M-context Sonnet variant when the slimmed menu
+  // is too large for the standard 200K context. Surfaced to the client
+  // via the X-Long-Context response header so the UI can show a
+  // "switched to Sonnet 1M" disclaimer banner.
+  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
   const payload = {
-    model: pickModel(useSonnet),
+    model: selection.model,
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),
@@ -121,13 +126,16 @@ export default async function handler(req) {
     ];
   }
 
+  const anthropicHeaders = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (selection.beta) anthropicHeaders['anthropic-beta'] = selection.beta;
+
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: anthropicHeaders,
     body: JSON.stringify(payload),
   });
 
@@ -143,6 +151,8 @@ export default async function handler(req) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
+      'X-Long-Context': selection.longContext ? '1' : '0',
+      'X-Model-Used': selection.model,
     },
   });
 }

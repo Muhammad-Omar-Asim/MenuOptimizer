@@ -2,7 +2,7 @@ import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
-import { MODEL, pickModel } from '../lib/anthropic-config.js';
+import { MODEL, pickModelForRun } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -68,8 +68,17 @@ export default async function handler(req) {
     : (webSearchOn ? 24000 : 32000);
 
   const useSonnet = body?.useSonnet === true;
+  // Mirror the analyze/review auto-promotion logic so View Prompts shows
+  // the exact model that would actually fire (including the 1M-context
+  // long-context switch when the slimmed menu is large).
+  const selection = pickModelForRun({
+    menuChars: slimmedJson?.length || 0,
+    useSonnet,
+  });
   return json({
-    model: pickModel(useSonnet),
+    model: selection.model,
+    long_context: selection.longContext,
+    long_context_reason: selection.reason,
     max_tokens: maxTokens,
     extended_thinking: useExtendedThinking,
     thinking_budget_tokens: useExtendedThinking ? 8000 : 0,
