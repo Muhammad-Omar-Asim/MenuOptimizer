@@ -848,6 +848,25 @@
       color: var(--text-3);
       font-variant-numeric: tabular-nums;
     }
+    /* Banner under the progress bar shown when the server auto-promoted
+       to the 1M-context model because the slimmed menu was too large
+       for the standard 200K context window. */
+    .long-context-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 14px;
+      margin: -12px 0 20px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--flippy-blue-edge);
+      background: var(--flippy-blue-soft);
+      color: var(--text);
+      font-size: 13px; line-height: 1.55;
+    }
+    .long-context-banner svg {
+      flex-shrink: 0;
+      margin-top: 2px;
+      color: var(--flippy-blue);
+    }
+    .long-context-banner strong { color: var(--flippy-blue); font-weight: 700; }
     .analysis-checklist {
       list-style: none; padding: 0; margin: 0;
       display: flex; flex-direction: column; gap: 4px;
@@ -1151,6 +1170,18 @@
             <div class="analysis-progress-fill" id="analysis-progress-fill"></div>
           </div>
           <div class="analysis-progress-pct" id="analysis-progress-pct">0%</div>
+          <!-- Auto-promotion banner — fades in when the server signalled it
+               had to switch to the 1M-context Sonnet variant because the
+               slimmed menu was larger than the standard 200K context window
+               could fit. Hidden by default. -->
+          <div class="long-context-banner" id="long-context-banner" style="display:none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>
+              <strong>Large menu detected.</strong>
+              Auto-switched to <strong>Claude Sonnet (1M context)</strong> for this run.
+              Output style and cost may differ slightly from the default Opus model.
+            </span>
+          </div>
           <ul class="analysis-checklist" id="analysis-checklist"></ul>
           <div class="analysis-complete" id="analysis-complete" style="display:none">
             <strong>Report prepared.</strong><br>
@@ -1736,12 +1767,19 @@
       const complete = document.getElementById('analysis-complete');
       const fill = document.getElementById('analysis-progress-fill');
       const pct = document.getElementById('analysis-progress-pct');
+      const lcBanner = document.getElementById('long-context-banner');
       checklist.innerHTML = '';
       complete.classList.remove('shown');
       complete.style.display = 'none';
       fill.style.width = '0%';
       pct.textContent = '0%';
+      if (lcBanner) lcBanner.style.display = 'none';
       document.getElementById('analysis-progress').style.display = 'block';
+    }
+
+    function _showLongContextBanner() {
+      const el = document.getElementById('long-context-banner');
+      if (el) el.style.display = 'flex';
     }
 
     function _markCheckpoint(label) {
@@ -1834,6 +1872,14 @@
         const err = await response.json().catch(() => ({}));
         setStatus('error', 'Server error ' + response.status + ': ' + (err?.error || response.statusText));
         return false;
+      }
+
+      // Auto-promotion signal from /api/analyze or /api/review: the server
+      // had to switch to the 1M-context Sonnet variant because the slimmed
+      // menu was too large for the standard 200K context window. Surface
+      // the disclaimer banner under the progress bar.
+      if (response.headers.get('X-Long-Context') === '1') {
+        _showLongContextBanner();
       }
 
       const reader = response.body.getReader();

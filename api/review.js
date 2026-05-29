@@ -1,7 +1,7 @@
 import { slimMenu } from '../lib/prompts/slim-menu.js';
 import { buildReviewPrompt } from '../lib/prompts/review-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL, pickModel } from '../lib/anthropic-config.js';
+import { MODEL, pickModelForRun } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
@@ -74,8 +74,12 @@ export default async function handler(req) {
     : (enableWebSearch ? 24000 : 32000);
 
   const useSonnet = body?.useSonnet === true;
+  // Auto-promote to 1M-context Sonnet on large menus. See api/analyze.js
+  // for the rationale; behaviour is mirrored here so confirmatory-check
+  // runs over a large menu don't downgrade back to standard context.
+  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
   const payload = {
-    model: pickModel(useSonnet),
+    model: selection.model,
     max_tokens: maxTokens,
     stream: true,
     system: buildSystemPrompt(),
@@ -88,13 +92,16 @@ export default async function handler(req) {
     payload.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
   }
 
+  const anthropicHeaders = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (selection.beta) anthropicHeaders['anthropic-beta'] = selection.beta;
+
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: anthropicHeaders,
     body: JSON.stringify(payload),
   });
 
@@ -110,6 +117,8 @@ export default async function handler(req) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
+      'X-Long-Context': selection.longContext ? '1' : '0',
+      'X-Model-Used': selection.model,
     },
   });
 }
