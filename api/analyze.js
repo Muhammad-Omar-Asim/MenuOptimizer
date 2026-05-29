@@ -103,11 +103,19 @@ export default async function handler(req) {
   // UI test toggle: when true, swap to Sonnet for this single run so the
   // user can compare cost/quality without changing the default.
   const useSonnet = body?.useSonnet === true;
-  // Auto-promote to the 1M-context Sonnet variant when the slimmed menu
-  // is too large for the standard 200K context. Surfaced to the client
-  // via the X-Long-Context response header so the UI can show a
-  // "switched to Sonnet 1M" disclaimer banner.
-  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
+  // Auto-promote to the 1M-context Sonnet variant when:
+  //   (a) the client confirmed it via the size-warning modal
+  //       (body.forceLongContext === true), or
+  //   (b) the slimmed menu turns out to exceed the threshold anyway
+  //       (safety net for the case the client didn't ask).
+  // Surfaced to the client via the X-Long-Context response header so
+  // the UI can show a "switched to Sonnet 1M" disclaimer banner.
+  const forceLongContext = body?.forceLongContext === true;
+  const selection = pickModelForRun({
+    menuChars: menuJson.length,
+    useSonnet,
+    forceLongContext,
+  });
   const payload = {
     model: selection.model,
     max_tokens: maxTokens,

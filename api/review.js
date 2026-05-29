@@ -74,10 +74,14 @@ export default async function handler(req) {
     : (enableWebSearch ? 24000 : 32000);
 
   const useSonnet = body?.useSonnet === true;
-  // Auto-promote to 1M-context Sonnet on large menus. See api/analyze.js
-  // for the rationale; behaviour is mirrored here so confirmatory-check
-  // runs over a large menu don't downgrade back to standard context.
-  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
+  // Mirror analyze.js: honour the client's forceLongContext flag (from
+  // the size-warning modal) and fall back to size-based auto-promotion.
+  const forceLongContext = body?.forceLongContext === true;
+  const selection = pickModelForRun({
+    menuChars: menuJson.length,
+    useSonnet,
+    forceLongContext,
+  });
   const payload = {
     model: selection.model,
     max_tokens: maxTokens,

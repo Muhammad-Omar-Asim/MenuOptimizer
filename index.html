@@ -953,6 +953,58 @@
       color: var(--text-3);
     }
 
+    /* "Large menu detected" confirmation modal — shown at Analyze click
+       when the uploaded file is over the size threshold. User confirms
+       to switch to the 1M-context Sonnet for this run. */
+    .size-modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      animation: fmFadeIn 0.25s ease-out;
+    }
+    .size-modal-card {
+      background: var(--surface-solid);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 28px 32px;
+      max-width: 480px;
+      width: calc(100% - 32px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    }
+    .size-modal-title {
+      font-family: 'Domine', 'Times New Roman', serif;
+      font-size: 22px; font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .size-modal-body {
+      font-size: 14px; line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .size-modal-body strong { color: var(--flippy-blue); }
+    .size-modal-points {
+      margin: 0 0 16px 18px;
+      padding: 0;
+      font-size: 13px; line-height: 1.65;
+      color: var(--text-2);
+    }
+    .size-modal-points li { margin-bottom: 4px; }
+    .size-modal-warning {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(247,116,43,0.10);
+      border: 1px solid rgba(247,116,43,0.30);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .size-modal-actions {
+      display: flex; justify-content: flex-end; gap: 10px;
+      margin-top: 18px;
+    }
+
     /* Bottom action bar */
     .bottom-actions {
       margin-top: 1.25rem;
@@ -1273,9 +1325,38 @@
     </div>
   </div>
 
+  <!-- Large-menu confirmation overlay — shown when the user clicks Analyze
+       on a menu over the size threshold. Explains the switch to the
+       1M-context Sonnet variant and asks for an explicit confirmation. -->
+  <div class="size-modal-backdrop" id="size-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="size-modal-title">
+    <div class="size-modal-card">
+      <div class="size-modal-title" id="size-modal-title">Large menu detected</div>
+      <p class="size-modal-body" id="size-modal-body">
+        Your menu file is <strong id="size-modal-size">—</strong>, which is too large for our
+        standard <strong>200K-token</strong> analysis model. We can switch to
+        <strong>Claude Sonnet (1M-token context)</strong> just for this run.
+      </p>
+      <ul class="size-modal-points">
+        <li>Output style may differ slightly from the default Opus model.</li>
+        <li>Cost is comparable (Sonnet is ~5× cheaper per token, but the larger context offsets some savings).</li>
+        <li>Affects only this run — your default setting is unchanged.</li>
+      </ul>
+      <p class="size-modal-body size-modal-warning" id="size-modal-warning" style="display:none">
+        ⚠️ Even at 1M tokens this menu may not fit. We'll try anyway, but you may need to split the menu or remove unused/disabled items.
+      </p>
+      <div class="size-modal-actions">
+        <button type="button" class="btn" onclick="cancelSizeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="confirmSizeModal()">Use 1M Context</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentMenu = null;
     let currentFileName = null;
+    let currentMenuRawSize = 0;   // raw .json byte count; used to decide whether to
+                                  // show the "switch to 1M-context model" modal
+                                  // before kicking off the analyze request
     let lastAnalysisText = '';
     let lastAnalysisHtml = '';
     let lastMetrics = null;
@@ -1436,6 +1517,7 @@
         try {
           currentMenu = JSON.parse(ev.target.result);
           currentFileName = file.name;
+          currentMenuRawSize = file.size;
           document.getElementById('file-name').textContent = file.name;
           document.getElementById('file-size').textContent = formatBytes(file.size);
           document.getElementById('file-clear').style.display = 'block';
@@ -1445,6 +1527,7 @@
         } catch (err) {
           setStatus('error', 'Invalid JSON: ' + err.message);
           currentMenu = null;
+          currentMenuRawSize = 0;
         }
       };
       reader.readAsText(file);
@@ -1452,6 +1535,7 @@
 
     function clearFile() {
       currentMenu = null;
+      currentMenuRawSize = 0;
       currentFileName = null;
       fileInput.value = '';
       document.getElementById('file-name').textContent = 'No file chosen';
@@ -1653,6 +1737,40 @@
     // ----- Run analysis -----
     // mode: 'full'  — analyze → review → format-ready output (requires reports)
     //       'basic' — single-pass structural audit only (no reports required)
+    // Size threshold (raw .json bytes) at which we pause and ask the user
+    // to confirm switching to the 1M-context Sonnet model. Picked so
+    // anything that slims down to roughly >= the server's auto-promote
+    // threshold (~500KB slimmed) triggers the modal — even after a
+    // generous 60% reduction from slimming, a 1.3MB raw file still ends
+    // up over 500KB.
+    const LARGE_MENU_BYTES = 1_300_000;
+    // Above this raw size, even the 1M-context model may not fit the
+    // menu after slimming. We still let the user try, but the modal
+    // surfaces the additional warning.
+    const HUGE_MENU_BYTES  = 7_000_000;
+
+    // Promise that's set up when the size-confirmation modal is shown.
+    // Resolves with true (user confirmed) or false (user cancelled).
+    let _sizeModalResolver = null;
+
+    function _showSizeModal(rawBytes) {
+      const modal     = document.getElementById('size-modal');
+      const sizeEl    = document.getElementById('size-modal-size');
+      const warningEl = document.getElementById('size-modal-warning');
+      sizeEl.textContent = formatBytes(rawBytes);
+      warningEl.style.display = rawBytes > HUGE_MENU_BYTES ? 'block' : 'none';
+      modal.style.display = 'flex';
+      return new Promise(resolve => { _sizeModalResolver = resolve; });
+    }
+    function confirmSizeModal() {
+      document.getElementById('size-modal').style.display = 'none';
+      if (_sizeModalResolver) { _sizeModalResolver(true); _sizeModalResolver = null; }
+    }
+    function cancelSizeModal() {
+      document.getElementById('size-modal').style.display = 'none';
+      if (_sizeModalResolver) { _sizeModalResolver(false); _sizeModalResolver = null; }
+    }
+
     async function runAnalysis(mode) {
       if (!currentMenu) {
         setStatus('error', 'Please choose a menu JSON file first.');
@@ -1666,6 +1784,18 @@
         setStatus('error',
           'Full Optimize requires supporting business reports. Use Basic Analysis instead, or add reports above.');
         return;
+      }
+
+      // If the menu is large, ask the user before silently switching
+      // models. forceLongContext drives the server-side selection.
+      let forceLongContext = false;
+      if (currentMenuRawSize >= LARGE_MENU_BYTES) {
+        const ok = await _showSizeModal(currentMenuRawSize);
+        if (!ok) {
+          setStatus('muted', 'Analysis cancelled.');
+          return;
+        }
+        forceLongContext = true;
       }
 
       const fullBtn = document.getElementById('analyze-btn');
@@ -1696,6 +1826,7 @@
           supportingReports: supportingReports.map(r => ({ name: r.name, content: r.content })),
           useExtendedThinking,
           useSonnet,
+          forceLongContext,
           mode,
         });
         if (!ok) { resetBtn(); return; }
@@ -1733,6 +1864,8 @@
           firstPassAudit: firstPassText,
           useExtendedThinking,
           useSonnet,
+          forceLongContext,
+          mode,
         });
 
         if (reviewed) {
