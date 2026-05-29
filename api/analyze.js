@@ -1,8 +1,19 @@
-import { slimMenu } from '../lib/prompts/slim-menu.js';
+import { slimMenu, chunkMenuByCategories } from '../lib/prompts/slim-menu.js';
 import { buildAnalyzePrompt } from '../lib/prompts/analyze-prompt.js';
 import { buildBasicAnalysisPrompt } from '../lib/prompts/basic-analysis-prompt.js';
 import { buildSystemPrompt } from '../lib/prompts/system-prompt.js';
-import { MODEL, pickModelForRun } from '../lib/anthropic-config.js';
+import { MODEL, SONNET_MODEL, LONG_CONTEXT_BETA, pickModelForRun } from '../lib/anthropic-config.js';
+
+// Above this slimmed-menu size, the menu won't fit in a single Sonnet 1M
+// call (after subtracting prompt, supporting reports, thinking budget,
+// and output reservation from the 1M context). We split categories
+// across N sequential LLM calls and stream their outputs back as one
+// combined SSE stream with "Part X of N" separators.
+//
+// 2.6MB ≈ 850K input tokens (at ~3 chars/token for JSON), leaving ~150K
+// for prompt + reports + output. Conservative — typical Flipdish menus
+// pack denser than 3 chars/token so this gives real headroom.
+const MAX_JSON_PER_CHUNK = 2_600_000;
 
 export const config = { runtime: 'edge' };
 
@@ -143,6 +154,37 @@ export default async function handler(req) {
   };
   if (selection.beta) anthropicHeaders['anthropic-beta'] = selection.beta;
 
+  // ── Chunked branch ────────────────────────────────────────────────────
+  // Menu too large for even one Sonnet 1M call. Split by category into N
+  // chunks, run them sequentially upstream, and pipe the SSE streams back
+  // to the client with "Part X of N" separators. Basic mode skips this
+  // (basic audits are structural and don't need the full menu detail).
+  if (!useBasicAnalysis && menuJson.length > MAX_JSON_PER_CHUNK) {
+    const numChunks = Math.ceil(menuJson.length / MAX_JSON_PER_CHUNK);
+    const chunks = chunkMenuByCategories(slim, numChunks);
+    if (chunks && chunks.length > 1) {
+      return streamChunkedAnalysis({
+        chunks,
+        numChunks: chunks.length,
+        location,
+        reports,
+        anthropicHeaders: {
+          ...anthropicHeaders,
+          'anthropic-beta': LONG_CONTEXT_BETA,
+        },
+        useExtendedThinking,
+        enableWebSearch,
+        maxTokens,
+        modelSelectionMeta: {
+          model: SONNET_MODEL,
+          longContext: true,
+        },
+      });
+    }
+    // Fell through (couldn't split — not enough categories). Let the
+    // single-call path proceed; Anthropic will return its own size error.
+  }
+
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: anthropicHeaders,
@@ -163,6 +205,111 @@ export default async function handler(req) {
       'Cache-Control': 'no-cache',
       'X-Long-Context': selection.longContext ? '1' : '0',
       'X-Model-Used': selection.model,
+    },
+  });
+}
+
+// Stream a chunked, multi-call audit back to the client as one combined
+// SSE stream. For each chunk:
+//   1. Inject a synthetic content_block_delta event with a "Part X of N"
+//      separator so the rendered audit makes it obvious where each chunk
+//      starts.
+//   2. Build the analyze prompt for this chunk's subset of categories
+//      (the prompt is told this is a partial menu so totals + global
+//      sections are scoped to the visible categories only).
+//   3. Fire the upstream Anthropic call with the 1M-context beta header.
+//   4. Pipe upstream.body straight through to the client.
+//
+// Sequential, not parallel — keeps the streaming experience coherent
+// (user sees Part 1 stream, then Part 2 stream) and avoids Anthropic
+// rate-limit issues. Trade-off: total wall time is N × per-chunk time
+// rather than max() of N parallel calls.
+function streamChunkedAnalysis({
+  chunks,
+  numChunks,
+  location,
+  reports,
+  anthropicHeaders,
+  useExtendedThinking,
+  enableWebSearch,
+  maxTokens,
+  modelSelectionMeta,
+}) {
+  const encoder = new TextEncoder();
+
+  function sseTextEvent(text) {
+    const obj = { type: 'content_block_delta', delta: { type: 'text_delta', text } };
+    return encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for (let i = 0; i < chunks.length; i++) {
+          // Separator marker so the rendered audit cleanly shows where
+          // each chunk starts.
+          const sep = i === 0
+            ? `# Part ${i + 1} of ${numChunks} — Menu Audit\n\n`
+            : `\n\n---\n\n# Part ${i + 1} of ${numChunks} — Menu Audit\n\n`;
+          controller.enqueue(sseTextEvent(sep));
+
+          // Chunk-aware prompt. Wraps the standard analyze prompt with a
+          // note explaining this is a partial-menu pass so the model
+          // scopes its analysis correctly.
+          const chunkMenuJson = JSON.stringify(chunks[i], null, 2);
+          const basePrompt = buildAnalyzePrompt({ menuJson: chunkMenuJson, location, reports });
+          const chunkPrompt =
+            `IMPORTANT: This is part ${i + 1} of ${numChunks} of a large menu that has been split for analysis. ` +
+            `You see only a subset of the categories. Compute all metrics, percentages, and analyses for the ` +
+            `categories visible in this part only — do NOT claim totals across the whole menu. The human will ` +
+            `combine your output with the other parts.\n\n` +
+            basePrompt;
+
+          const payload = {
+            model: modelSelectionMeta.model,
+            max_tokens: maxTokens,
+            stream: true,
+            system: buildSystemPrompt(),
+            messages: [{ role: 'user', content: chunkPrompt }],
+          };
+          if (useExtendedThinking) payload.thinking = { type: 'enabled', budget_tokens: 8000 };
+          if (enableWebSearch) payload.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
+
+          const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: anthropicHeaders,
+            body: JSON.stringify(payload),
+          });
+
+          if (!upstream.ok) {
+            const errText = await upstream.text();
+            controller.enqueue(sseTextEvent(`\n\n[Part ${i + 1} of ${numChunks} failed: ${errText.slice(0, 300)}]\n\n`));
+            continue; // try next chunk
+          }
+
+          // Pipe the upstream SSE body straight through to the client.
+          const reader = upstream.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        }
+        controller.close();
+      } catch (e) {
+        controller.enqueue(sseTextEvent(`\n\n[Chunked analysis aborted: ${String(e?.message || e).slice(0, 300)}]\n\n`));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'X-Long-Context': '1',
+      'X-Chunked': String(numChunks),
+      'X-Model-Used': modelSelectionMeta.model,
     },
   });
 }
