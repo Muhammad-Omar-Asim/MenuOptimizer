@@ -11,7 +11,7 @@ export const config = { runtime: 'edge' };
 // figures, fill gaps, and tighten language rather than starting blind.
 
 // See api/analyze.js for the rationale on this value. Kept in sync.
-const MAX_MENU_CHARS = 2_000_000;
+const MAX_MENU_CHARS = 5_000_000;
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -61,7 +61,7 @@ export default async function handler(req) {
   const menuJson = JSON.stringify(slim, null, 2);
   if (menuJson.length > MAX_MENU_CHARS) {
     return new Response(JSON.stringify({
-      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, exceeds the ${(MAX_MENU_CHARS / 1000)}KB server-side budget. Menus this large will also exceed Anthropic's 200K-token context window — split the menu or switch to a long-context model variant.`,
+      error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, exceeds the ${(MAX_MENU_CHARS / 1000)}KB server-side budget. Even the 1M-token context window tops out at ~4MB — split the menu or remove unused/disabled items.`,
     }), { status: 413, headers: { 'Content-Type': 'application/json' } });
   }
 
@@ -74,10 +74,14 @@ export default async function handler(req) {
     : (enableWebSearch ? 24000 : 32000);
 
   const useSonnet = body?.useSonnet === true;
-  // Auto-promote to 1M-context Sonnet on large menus. See api/analyze.js
-  // for the rationale; behaviour is mirrored here so confirmatory-check
-  // runs over a large menu don't downgrade back to standard context.
-  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
+  // Mirror analyze.js: honour the client's forceLongContext flag (from
+  // the size-warning modal) and fall back to size-based auto-promotion.
+  const forceLongContext = body?.forceLongContext === true;
+  const selection = pickModelForRun({
+    menuChars: menuJson.length,
+    useSonnet,
+    forceLongContext,
+  });
   const payload = {
     model: selection.model,
     max_tokens: maxTokens,

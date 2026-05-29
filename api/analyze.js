@@ -6,16 +6,19 @@ import { MODEL, pickModelForRun } from '../lib/anthropic-config.js';
 
 export const config = { runtime: 'edge' };
 
-// Slimmed-menu size budget. ~2MB ≈ ~525K input tokens.
+// Slimmed-menu size budget. 5MB ≈ ~1.25M input tokens at ~4 chars/token.
 //
-// Note: Anthropic's standard models have a 200K-token context window. A
-// menu near this 2MB cap will overflow that window and Anthropic will
-// reject the request upstream with "prompt is too long". This budget is
-// just our own guardrail — picking a generous value here lets the
-// Anthropic API surface the more specific error when it happens, rather
-// than us pre-rejecting menus that might fit (e.g. on a 1M-context
-// model variant).
-const MAX_MENU_CHARS = 2_000_000;
+// We pair this with the 1M-context auto-promotion in pickModelForRun:
+// menus over 500KB are silently routed to Sonnet with the 1M-context beta
+// header, which fits up to ~4MB of JSON input. The 5MB cap here gives the
+// upstream API just enough headroom to return a precise "prompt too long"
+// error for menus that genuinely don't fit, instead of us pre-rejecting
+// at a lower bound.
+//
+// If a menu still bounces off Anthropic at 1M context, the realistic next
+// move is targeted slimming (find which fields are still bloating it) or
+// chunked-by-category analysis.
+const MAX_MENU_CHARS = 5_000_000;
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -65,8 +68,7 @@ export default async function handler(req) {
   if (menuJson.length > MAX_MENU_CHARS) {
     return new Response(JSON.stringify({
       error: `Menu JSON is ${(menuJson.length / 1000).toFixed(0)}KB after slimming, which exceeds the ${(MAX_MENU_CHARS / 1000)}KB server-side budget. ` +
-             `Try removing base64 image data or splitting the menu into sections. ` +
-             `Note: even within this budget, menus larger than ~700KB may still be rejected by Anthropic if they exceed the model's 200K-token context window.`
+             `Even the 1M-token context window tops out at ~4MB of JSON. Try splitting the menu into sections or remove unused / disabled items before uploading.`
     }), { status: 413, headers: { 'Content-Type': 'application/json' } });
   }
 
@@ -101,11 +103,19 @@ export default async function handler(req) {
   // UI test toggle: when true, swap to Sonnet for this single run so the
   // user can compare cost/quality without changing the default.
   const useSonnet = body?.useSonnet === true;
-  // Auto-promote to the 1M-context Sonnet variant when the slimmed menu
-  // is too large for the standard 200K context. Surfaced to the client
-  // via the X-Long-Context response header so the UI can show a
-  // "switched to Sonnet 1M" disclaimer banner.
-  const selection = pickModelForRun({ menuChars: menuJson.length, useSonnet });
+  // Auto-promote to the 1M-context Sonnet variant when:
+  //   (a) the client confirmed it via the size-warning modal
+  //       (body.forceLongContext === true), or
+  //   (b) the slimmed menu turns out to exceed the threshold anyway
+  //       (safety net for the case the client didn't ask).
+  // Surfaced to the client via the X-Long-Context response header so
+  // the UI can show a "switched to Sonnet 1M" disclaimer banner.
+  const forceLongContext = body?.forceLongContext === true;
+  const selection = pickModelForRun({
+    menuChars: menuJson.length,
+    useSonnet,
+    forceLongContext,
+  });
   const payload = {
     model: selection.model,
     max_tokens: maxTokens,
