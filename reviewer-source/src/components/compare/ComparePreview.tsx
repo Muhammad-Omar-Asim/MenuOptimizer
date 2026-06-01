@@ -367,30 +367,54 @@ export const ComparePreview: React.FC = () => {
 
               {/* PDF Report Upload */}
               <div className="mt-4">
-                <label className="relative flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-white px-4 text-center transition-colors hover:border-flipdish/40">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
-                      <FileUp size={16} />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-semibold text-neutral-900">
-                        {uploadedPdf ? `PDF Uploaded: ${uploadedPdf.name}` : 'Upload PDF Report (Optional)'}
-                      </p>
-                      <p className="text-[11px] text-neutral-500">
-                        {uploadedPdf ? 'Click View Report to display, or upload a different file' : 'Drop or click to attach a PDF report for reference'}
-                      </p>
-                    </div>
+                <div className="relative flex items-center gap-3 rounded-xl border-2 border-dashed border-neutral-300 bg-white px-4 py-3 transition-colors hover:border-flipdish/40">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
+                    <FileUp size={16} />
                   </div>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handlePdfUpload(f);
-                    }}
-                  />
-                </label>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="truncate text-xs font-semibold text-neutral-900">
+                      {uploadedPdf ? `PDF Uploaded: ${uploadedPdf.name}` : 'Upload PDF Report (Optional)'}
+                    </p>
+                    <p className="text-[11px] text-neutral-500">
+                      {uploadedPdf ? 'Click View Report to display' : 'Click or drop to attach a PDF report for reference'}
+                    </p>
+                  </div>
+                  {uploadedPdf ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleViewPdf}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-flipdish px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-flipdish-dark"
+                        title={`View ${uploadedPdf.name}`}
+                      >
+                        <FileText size={12} />
+                        View Report
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+                          setUploadedPdf(null);
+                          setPdfBlobUrl(null);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-red-600"
+                        title="Remove PDF"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handlePdfUpload(f);
+                      }}
+                    />
+                  )}
+                </div>
                 {pdfError && (
                   <p className="mt-1 text-xs font-semibold text-red-600">{pdfError}</p>
                 )}
