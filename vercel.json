@@ -1,4 +1,16 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "public"
+  "buildCommand": "cd reviewer && npm ci --legacy-peer-deps && npm run build",
+  "outputDirectory": ".",
+  "installCommand": "npm --version",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/reviewer/(.*)",
+      "destination": "/reviewer/dist/$1"
+    },
+    {
+      "source": "/reviewer",
+      "destination": "/reviewer/dist/index.html"
+    }
+  ]
 }

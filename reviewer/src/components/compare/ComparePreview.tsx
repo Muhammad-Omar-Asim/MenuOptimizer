@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks } from 'lucide-react';
+import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks, FileText } from 'lucide-react';
 import { useStore } from '../../hooks/useStore';
 import type { NormalizedMenu, SalesChannel } from '../../types';
 import { MenuExplorer, type DiffMeta } from './MenuExplorer';
@@ -7,7 +7,7 @@ import { SlotUpload } from './SlotUpload';
 import { ShareSessionModal } from './ShareSessionModal';
 import { ChangeSummaryModal } from './ChangeSummaryModal';
 import { SubmitCommentsModal } from '../comments/SubmitCommentsModal';
-import { useAllComments, getSessionIdFromUrl, importCommentsFromJson } from '../../hooks/useComments';
+import { useAllComments, getSessionIdFromUrl } from '../../hooks/useComments';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { computeSessionExpiry } from '../../lib/session/sessionLifetime';
 
@@ -62,7 +62,8 @@ export const ComparePreview: React.FC = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [bundleError, setBundleError] = useState<string | null>(null);
+  const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const comments = useAllComments();
   const unresolvedComments = comments.filter((c) => !c.resolved);
@@ -220,66 +221,19 @@ export const ComparePreview: React.FC = () => {
     }
   };
 
-  const handleBundleUpload = (file: File) => {
-    setBundleError(null);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const payload = JSON.parse(String(reader.result ?? ''));
-        if (payload?.type !== 'mjr_compare_session_v1') {
-          throw new Error('Invalid file format. Please upload a valid Compare Session Bundle.');
-        }
+  const handlePdfUpload = (file: File) => {
+    setPdfError(null);
+    if (file.type !== 'application/pdf') {
+      setPdfError('Please upload a PDF file');
+      return;
+    }
+    setUploadedPdf(file);
+  };
 
-        setMenu(payload.menuA);
-        setMenuB(payload.menuB || null);
-        setReviewProductScopes(payload.scopes);
-
-        if (Array.isArray(payload.comments)) {
-          importCommentsFromJson(JSON.stringify({ comments: payload.comments }));
-        }
-
-        // If connected to Supabase, let's instantly save it to the cloud to establish sync!
-        if (isSupabaseConfigured && supabase) {
-          const { data, error } = await supabase
-            .from('compare_sessions')
-            .insert({
-              menu_a: payload.menuA,
-              menu_b: payload.menuB,
-              scopes: payload.scopes,
-            })
-            .select('id')
-            .single();
-
-          if (!error && data) {
-            const newId = data.id;
-            setShareSessionId(newId);
-            const newUrl = `${window.location.origin}${window.location.pathname}?sessionId=${newId}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-
-            if (payload.comments?.length > 0) {
-              const insertPayload = payload.comments.map((c: any) => ({
-                id: c.id,
-                session_id: newId,
-                menu_id: c.menuId,
-                item_id: c.itemId,
-                item_name: c.itemName,
-                category_name: c.categoryName || null,
-                author: c.author,
-                text: c.text,
-                resolved: c.resolved,
-                attachment_url: c.attachmentUrl || null,
-              }));
-              await supabase.from('comments').insert(insertPayload);
-            }
-          }
-        } else {
-          setShareSessionId(payload.id || 'imported');
-        }
-      } catch (err: any) {
-        setBundleError(err.message || 'Failed to parse session bundle.');
-      }
-    };
-    reader.readAsText(file);
+  const handleViewPdf = () => {
+    if (!uploadedPdf) return;
+    const url = URL.createObjectURL(uploadedPdf);
+    window.open(url, '_blank');
   };
 
   const formatSessionTime = (ts: number): string => {
@@ -342,26 +296,38 @@ export const ComparePreview: React.FC = () => {
               </div>
             </div>
 
-            {/* Session Bundle Drop Zone */}
+            {/* PDF Report Upload */}
             <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white p-6 text-center hover:border-flipdish/40 transition-colors">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
                 <UploadCloud size={20} />
               </div>
-              <h3 className="mt-3 text-xs font-semibold text-neutral-900">Import Portable Session Bundle</h3>
+              <h3 className="mt-3 text-xs font-semibold text-neutral-900">Upload Report (PDF)</h3>
               <p className="mt-1 text-[11px] text-neutral-400">
-                Drop a previously exported `.json` CompareSession file here to resume your review.
+                {uploadedPdf ? `Uploaded: ${uploadedPdf.name}` : 'Drop a PDF report file here or click to browse'}
               </p>
               <input
                 type="file"
-                accept="application/json"
+                accept="application/pdf"
                 className="absolute inset-0 cursor-pointer opacity-0"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleBundleUpload(f);
+                  if (f) handlePdfUpload(f);
                 }}
               />
-              {bundleError && (
-                <p className="mt-2 text-xs font-semibold text-red-600">{bundleError}</p>
+              {pdfError && (
+                <p className="mt-2 text-xs font-semibold text-red-600">{pdfError}</p>
+              )}
+              {uploadedPdf && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUploadedPdf(null);
+                  }}
+                  className="mt-2 text-xs text-red-600 hover:underline"
+                >
+                  Remove PDF
+                </button>
               )}
             </div>
           </div>
@@ -458,15 +424,28 @@ export const ComparePreview: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {menu && menuB && (
-            <button
-              type="button"
-              onClick={() => setSummaryOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
-              title="Show summary of changes between OLD and NEW"
-            >
-              <ListChecks size={12} />
-              Show summary of changes
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+                title="Show summary of changes between OLD and NEW"
+              >
+                <ListChecks size={12} />
+                Show summary of changes
+              </button>
+              {uploadedPdf && (
+                <button
+                  type="button"
+                  onClick={handleViewPdf}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-flipdish/30 bg-flipdish/10 px-3 py-1.5 text-xs font-semibold text-flipdish transition-colors hover:bg-flipdish/20"
+                  title="View uploaded PDF report"
+                >
+                  <FileText size={12} />
+                  View Report
+                </button>
+              )}
+            </>
           )}
 
           {unresolvedComments.length > 0 && !sessionSubmitted && (

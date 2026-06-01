@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   base: '/reviewer/',
   build: {
-    outDir: path.resolve(__dirname, '../public/reviewer'),
+    outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
   },
 })
