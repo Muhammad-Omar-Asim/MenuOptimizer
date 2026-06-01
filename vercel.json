@@ -1,21 +1,4 @@
 {
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "."
-      }
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/reviewer",
-      "destination": "/reviewer/dist/index.html"
-    },
-    {
-      "source": "/reviewer/(.*)",
-      "destination": "/reviewer/dist/$1"
-    }
-  ]
+  "buildCommand": "npm run build",
+  "outputDirectory": "public"
 }

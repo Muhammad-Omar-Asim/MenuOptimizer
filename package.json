@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd reviewer && npm install && npm run build"
+    "build": "mkdir -p public && cp index.html public/index.html && cp -r lib public/ && cd reviewer && npm install && npm run build"
   }
 }
