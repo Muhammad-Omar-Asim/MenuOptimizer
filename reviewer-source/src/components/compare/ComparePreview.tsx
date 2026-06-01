@@ -315,6 +315,34 @@ export const ComparePreview: React.FC = () => {
     });
   };
 
+  // PDF viewer modal - rendered in both empty and active states so it
+  // works regardless of whether the user has uploaded menus yet.
+  const pdfViewerModal = pdfViewerOpen && pdfBlobUrl && uploadedPdf ? (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-neutral-900/90 backdrop-blur-sm">
+      <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-4 py-3 text-white">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText size={18} className="shrink-0 text-flipdish" />
+          <span className="truncate text-sm font-semibold" title={uploadedPdf.name}>
+            {uploadedPdf.name}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleClosePdfViewer}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+          title="Close PDF viewer"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <iframe
+        src={pdfBlobUrl}
+        title={uploadedPdf.name}
+        className="flex-1 w-full bg-white"
+      />
+    </div>
+  ) : null;
+
   // 1. Client empty session state or normal empty upload dashboard
   if (!menu && !menuB) {
     if (isClientReview) {
@@ -487,6 +515,7 @@ export const ComparePreview: React.FC = () => {
             )}
           </div>
         </div>
+        {pdfViewerModal}
       </div>
     );
   }
@@ -551,7 +580,7 @@ export const ComparePreview: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleViewPdf}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-flipdish/30 bg-flipdish/10 px-3 py-1.5 text-xs font-semibold text-flipdish transition-colors hover:bg-flipdish/20"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-flipdish px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-flipdish-hover"
                   title={`View uploaded PDF: ${uploadedPdf.name}`}
                 >
                   <FileText size={12} />
@@ -736,31 +765,7 @@ export const ComparePreview: React.FC = () => {
         />
       )}
 
-      {pdfViewerOpen && pdfBlobUrl && uploadedPdf && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-4 py-3 text-white">
-            <div className="flex items-center gap-2 min-w-0">
-              <FileText size={18} className="shrink-0 text-flipdish" />
-              <span className="truncate text-sm font-semibold" title={uploadedPdf.name}>
-                {uploadedPdf.name}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleClosePdfViewer}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
-              title="Close PDF viewer"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <iframe
-            src={pdfBlobUrl}
-            title={uploadedPdf.name}
-            className="flex-1 w-full bg-white"
-          />
-        </div>
-      )}
+      {pdfViewerModal}
     </div>
   );
 };
