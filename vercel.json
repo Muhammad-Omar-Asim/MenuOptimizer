@@ -1,0 +1,13 @@
+{
+  "buildCommand": "cd reviewer && npm install && npm run build && cd ..",
+  "rewrites": [
+    {
+      "source": "/reviewer",
+      "destination": "/reviewer/dist/index.html"
+    },
+    {
+      "source": "/reviewer/(.*)",
+      "destination": "/reviewer/dist/$1"
+    }
+  ]
+}
