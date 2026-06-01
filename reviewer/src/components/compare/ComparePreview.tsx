@@ -7,7 +7,7 @@ import { SlotUpload } from './SlotUpload';
 import { ShareSessionModal } from './ShareSessionModal';
 import { ChangeSummaryModal } from './ChangeSummaryModal';
 import { SubmitCommentsModal } from '../comments/SubmitCommentsModal';
-import { useAllComments, getSessionIdFromUrl, importCommentsFromJson } from '../../hooks/useComments';
+import { useAllComments, getSessionIdFromUrl } from '../../hooks/useComments';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { computeSessionExpiry } from '../../lib/session/sessionLifetime';
 
