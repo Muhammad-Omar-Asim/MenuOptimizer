@@ -1,3 +1,20 @@
 {
-  "outputDirectory": "public"
+  "rewrites": [
+    {
+      "source": "/reviewer",
+      "destination": "/reviewer/dist/index.html"
+    },
+    {
+      "source": "/reviewer/",
+      "destination": "/reviewer/dist/index.html"
+    },
+    {
+      "source": "/reviewer/assets/:path*",
+      "destination": "/reviewer/dist/assets/:path*"
+    },
+    {
+      "source": "/reviewer/:path*",
+      "destination": "/reviewer/dist/:path*"
+    }
+  ]
 }
