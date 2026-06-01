@@ -1,5 +1,13 @@
 {
-  "buildCommand": "cd reviewer && npm install && npm run build && cd ..",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "."
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/reviewer",
