@@ -7,7 +7,7 @@ import { SlotUpload } from './SlotUpload';
 import { ShareSessionModal } from './ShareSessionModal';
 import { ChangeSummaryModal } from './ChangeSummaryModal';
 import { SubmitCommentsModal } from '../comments/SubmitCommentsModal';
-import { useAllComments, getSessionIdFromUrl } from '../../hooks/useComments';
+import { useAllComments, getSessionIdFromUrl, importCommentsFromJson } from '../../hooks/useComments';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { computeSessionExpiry } from '../../lib/session/sessionLifetime';
 
@@ -62,6 +62,7 @@ export const ComparePreview: React.FC = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [bundleError, setBundleError] = useState<string | null>(null);
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -221,6 +222,68 @@ export const ComparePreview: React.FC = () => {
     }
   };
 
+  const handleBundleUpload = (file: File) => {
+    setBundleError(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const payload = JSON.parse(String(reader.result ?? ''));
+        if (payload?.type !== 'mjr_compare_session_v1') {
+          throw new Error('Invalid file format. Please upload a valid Compare Session Bundle.');
+        }
+
+        setMenu(payload.menuA);
+        setMenuB(payload.menuB || null);
+        setReviewProductScopes(payload.scopes);
+
+        if (Array.isArray(payload.comments)) {
+          importCommentsFromJson(JSON.stringify({ comments: payload.comments }));
+        }
+
+        // If connected to Supabase, let's instantly save it to the cloud to establish sync!
+        if (isSupabaseConfigured && supabase) {
+          const { data, error } = await supabase
+            .from('compare_sessions')
+            .insert({
+              menu_a: payload.menuA,
+              menu_b: payload.menuB,
+              scopes: payload.scopes,
+            })
+            .select('id')
+            .single();
+
+          if (!error && data) {
+            const newId = data.id;
+            setShareSessionId(newId);
+            const newUrl = `${window.location.origin}${window.location.pathname}?sessionId=${newId}`;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+
+            if (payload.comments?.length > 0) {
+              const insertPayload = payload.comments.map((c: any) => ({
+                id: c.id,
+                session_id: newId,
+                menu_id: c.menuId,
+                item_id: c.itemId,
+                item_name: c.itemName,
+                category_name: c.categoryName || null,
+                author: c.author,
+                text: c.text,
+                resolved: c.resolved,
+                attachment_url: c.attachmentUrl || null,
+              }));
+              await supabase.from('comments').insert(insertPayload);
+            }
+          }
+        } else {
+          setShareSessionId(payload.id || 'imported');
+        }
+      } catch (err: any) {
+        setBundleError(err.message || 'Failed to parse session bundle.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handlePdfUpload = (file: File) => {
     setPdfError(null);
     if (file.type !== 'application/pdf') {
@@ -294,6 +357,29 @@ export const ComparePreview: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Session Bundle Upload */}
+            <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white p-6 text-center hover:border-flipdish/40 transition-colors">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
+                <UploadCloud size={20} />
+              </div>
+              <h3 className="mt-3 text-xs font-semibold text-neutral-900">Import Portable Session Bundle</h3>
+              <p className="mt-1 text-[11px] text-neutral-400">
+                Drop a previously exported `.json` CompareSession file here to resume your review.
+              </p>
+              <input
+                type="file"
+                accept="application/json"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleBundleUpload(f);
+                }}
+              />
+              {bundleError && (
+                <p className="mt-2 text-xs font-semibold text-red-600">{bundleError}</p>
+              )}
             </div>
 
             {/* PDF Report Upload */}
