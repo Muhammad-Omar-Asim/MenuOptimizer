@@ -1,15 +1,4 @@
 {
-  "buildCommand": "cd reviewer && npm install && npm run build",
   "outputDirectory": ".",
-  "framework": null,
-  "rewrites": [
-    {
-      "source": "/reviewer",
-      "destination": "/reviewer/dist/index.html"
-    },
-    {
-      "source": "/reviewer/(.*)",
-      "destination": "/reviewer/dist/$1"
-    }
-  ]
+  "framework": null
 }

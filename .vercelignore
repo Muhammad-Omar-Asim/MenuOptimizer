@@ -3,16 +3,3 @@ node_modules
 *.log
 .env*
 .DS_Store
-reviewer/src
-reviewer/public
-reviewer/index.html
-reviewer/package.json
-reviewer/package-lock.json
-reviewer/tsconfig*.json
-reviewer/vite.config.ts
-reviewer/eslint.config.js
-reviewer/postcss.config.js
-reviewer/README.md
-reviewer/menu_examples
-reviewer/.github
-reviewer/Flipdish*.png
