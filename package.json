@@ -1,8 +1,5 @@
 {
   "name": "menu-analyzer",
   "private": true,
-  "type": "module",
-  "scripts": {
-    "vercel-build": "mkdir -p public && cp index.html public/index.html && cp -r lib public/ 2>/dev/null || true && cd reviewer-source && npm install && npm run build"
-  }
+  "type": "module"
 }
