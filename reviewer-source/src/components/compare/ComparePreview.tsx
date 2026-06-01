@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks, FileText } from 'lucide-react';
+import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks } from 'lucide-react';
 import { useStore } from '../../hooks/useStore';
 import type { NormalizedMenu, SalesChannel } from '../../types';
 import { MenuExplorer, type DiffMeta } from './MenuExplorer';
@@ -63,8 +63,6 @@ export const ComparePreview: React.FC = () => {
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
-  const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const comments = useAllComments();
   const unresolvedComments = comments.filter((c) => !c.resolved);
@@ -284,21 +282,6 @@ export const ComparePreview: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handlePdfUpload = (file: File) => {
-    setPdfError(null);
-    if (file.type !== 'application/pdf') {
-      setPdfError('Please upload a PDF file');
-      return;
-    }
-    setUploadedPdf(file);
-  };
-
-  const handleViewPdf = () => {
-    if (!uploadedPdf) return;
-    const url = URL.createObjectURL(uploadedPdf);
-    window.open(url, '_blank');
-  };
-
   const formatSessionTime = (ts: number): string => {
     return new Date(ts).toLocaleDateString(undefined, {
       month: 'short',
@@ -359,7 +342,7 @@ export const ComparePreview: React.FC = () => {
               </div>
             </div>
 
-            {/* Session Bundle Upload */}
+            {/* Session Bundle Drop Zone */}
             <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white p-6 text-center hover:border-flipdish/40 transition-colors">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
                 <UploadCloud size={20} />
@@ -379,41 +362,6 @@ export const ComparePreview: React.FC = () => {
               />
               {bundleError && (
                 <p className="mt-2 text-xs font-semibold text-red-600">{bundleError}</p>
-              )}
-            </div>
-
-            {/* PDF Report Upload */}
-            <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-white p-6 text-center hover:border-flipdish/40 transition-colors">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
-                <UploadCloud size={20} />
-              </div>
-              <h3 className="mt-3 text-xs font-semibold text-neutral-900">Upload Report (PDF)</h3>
-              <p className="mt-1 text-[11px] text-neutral-400">
-                {uploadedPdf ? `Uploaded: ${uploadedPdf.name}` : 'Drop a PDF report file here or click to browse'}
-              </p>
-              <input
-                type="file"
-                accept="application/pdf"
-                className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handlePdfUpload(f);
-                }}
-              />
-              {pdfError && (
-                <p className="mt-2 text-xs font-semibold text-red-600">{pdfError}</p>
-              )}
-              {uploadedPdf && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUploadedPdf(null);
-                  }}
-                  className="mt-2 text-xs text-red-600 hover:underline"
-                >
-                  Remove PDF
-                </button>
               )}
             </div>
           </div>
@@ -510,28 +458,15 @@ export const ComparePreview: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {menu && menuB && (
-            <>
-              <button
-                type="button"
-                onClick={() => setSummaryOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
-                title="Show summary of changes between OLD and NEW"
-              >
-                <ListChecks size={12} />
-                Show summary of changes
-              </button>
-              {uploadedPdf && (
-                <button
-                  type="button"
-                  onClick={handleViewPdf}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-flipdish/30 bg-flipdish/10 px-3 py-1.5 text-xs font-semibold text-flipdish transition-colors hover:bg-flipdish/20"
-                  title="View uploaded PDF report"
-                >
-                  <FileText size={12} />
-                  View Report
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={() => setSummaryOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              title="Show summary of changes between OLD and NEW"
+            >
+              <ListChecks size={12} />
+              Show summary of changes
+            </button>
           )}
 
           {unresolvedComments.length > 0 && !sessionSubmitted && (
