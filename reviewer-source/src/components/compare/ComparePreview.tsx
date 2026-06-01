@@ -566,28 +566,46 @@ export const ComparePreview: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {menu && menuB && (
-            <>
-              <button
-                type="button"
-                onClick={() => setSummaryOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
-                title="Show summary of changes between OLD and NEW"
-              >
-                <ListChecks size={12} />
-                Show summary of changes
-              </button>
-              {uploadedPdf && (
-                <button
-                  type="button"
-                  onClick={handleViewPdf}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-flipdish px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-flipdish-hover"
-                  title={`View uploaded PDF: ${uploadedPdf.name}`}
-                >
-                  <FileText size={12} />
-                  View Report
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={() => setSummaryOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              title="Show summary of changes between OLD and NEW"
+            >
+              <ListChecks size={12} />
+              Show summary of changes
+            </button>
+          )}
+
+          {menu && menuB && uploadedPdf && (
+            <button
+              type="button"
+              onClick={handleViewPdf}
+              className="inline-flex items-center gap-1.5 rounded-full bg-flipdish px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-flipdish-hover"
+              title={`View uploaded PDF: ${uploadedPdf.name}`}
+            >
+              <FileText size={12} />
+              View Report
+            </button>
+          )}
+
+          {menu && menuB && !uploadedPdf && (
+            <label
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              title="Upload a PDF report"
+            >
+              <FileUp size={12} />
+              Upload PDF
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handlePdfUpload(f);
+                }}
+              />
+            </label>
           )}
 
           {unresolvedComments.length > 0 && !sessionSubmitted && (
