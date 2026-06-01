@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks, FileText, FileUp } from 'lucide-react';
 import { useStore } from '../../hooks/useStore';
 import type { NormalizedMenu, SalesChannel } from '../../types';
@@ -52,7 +53,7 @@ function safeWrite(key: string, value: unknown): void {
 }
 
 export const ComparePreview: React.FC = () => {
-  const { menu, menuB, setMenu, setMenuB, setReviewProductScopes, sessionSubmitted, setSessionSubmitted } = useStore();
+  const { menu, menuB, setMenu, setMenuB, setReviewProductScopes, sessionSubmitted, setSessionSubmitted, uploadedPdf, pdfBlobUrl, setUploadedPdf } = useStore();
   const [channel, setChannel] = useState<SalesChannel>('Collection');
   const [diffOn, setDiffOn] = useState(true);
 
@@ -63,10 +64,8 @@ export const ComparePreview: React.FC = () => {
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
-  const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   const comments = useAllComments();
   const unresolvedComments = comments.filter((c) => !c.resolved);
@@ -292,9 +291,7 @@ export const ComparePreview: React.FC = () => {
       setPdfError('Please upload a PDF file');
       return;
     }
-    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     setUploadedPdf(file);
-    setPdfBlobUrl(URL.createObjectURL(file));
   };
 
   const handleViewPdf = () => {
@@ -315,33 +312,57 @@ export const ComparePreview: React.FC = () => {
     });
   };
 
-  // PDF viewer modal - rendered in both empty and active states so it
-  // works regardless of whether the user has uploaded menus yet.
-  const pdfViewerModal = pdfViewerOpen && pdfBlobUrl && uploadedPdf ? (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-neutral-900/90 backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-4 py-3 text-white">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText size={18} className="shrink-0 text-flipdish" />
-          <span className="truncate text-sm font-semibold" title={uploadedPdf.name}>
-            {uploadedPdf.name}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleClosePdfViewer}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
-          title="Close PDF viewer"
+  // PDF viewer popup - same modal pattern as Show Summary of Changes.
+  // Rendered via createPortal so it works regardless of which view path
+  // the component is in (empty state or active split preview).
+  const pdfViewerModal = pdfViewerOpen && pdfBlobUrl && uploadedPdf
+    ? createPortal(
+        <div
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePdfViewer();
+          }}
+          className="fixed inset-0 z-[300] flex items-end justify-center bg-neutral-900/55 p-0 sm:items-center sm:p-4"
         >
-          <X size={18} />
-        </button>
-      </div>
-      <iframe
-        src={pdfBlobUrl}
-        title={uploadedPdf.name}
-        className="flex-1 w-full bg-white"
-      />
-    </div>
-  ) : null;
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-viewer-title"
+            className="flex w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-2xl"
+            style={{ maxHeight: 'min(92vh, 92svh)' }}
+          >
+            <header className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={18} className="shrink-0 text-flipdish" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+                    PDF Report
+                  </p>
+                  <h2 id="pdf-viewer-title" className="mt-0.5 truncate text-base font-semibold text-neutral-900" title={uploadedPdf.name}>
+                    {uploadedPdf.name}
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClosePdfViewer}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                title="Close PDF viewer"
+                aria-label="Close PDF viewer"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <iframe
+              src={pdfBlobUrl}
+              title={uploadedPdf.name}
+              className="flex-1 w-full bg-neutral-100"
+            />
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
 
   // 1. Client empty session state or normal empty upload dashboard
   if (!menu && !menuB) {
@@ -420,11 +441,7 @@ export const ComparePreview: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
-                          setUploadedPdf(null);
-                          setPdfBlobUrl(null);
-                        }}
+                        onClick={() => setUploadedPdf(null)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-red-600"
                         title="Remove PDF"
                       >
