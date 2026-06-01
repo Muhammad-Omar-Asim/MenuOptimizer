@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vercel-build": "cd reviewer && npm ci --legacy-peer-deps && npm run build"
+    "vercel-build": "cd reviewer && npm install && npm run build"
   }
 }
