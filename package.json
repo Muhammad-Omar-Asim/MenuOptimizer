@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "vercel-build": "cd reviewer && npm install && npm run build"
+    "vercel-build": "cd reviewer && npm install && npm run build && cd .. && mkdir -p public/reviewer && cp -r reviewer/dist/* public/reviewer/"
   }
 }
