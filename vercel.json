@@ -1,12 +1,3 @@
 {
-  "rewrites": [
-    {
-      "source": "/reviewer",
-      "destination": "/public/reviewer/index.html"
-    },
-    {
-      "source": "/reviewer/(.*)",
-      "destination": "/public/reviewer/$1"
-    }
-  ]
+  "public": true
 }
