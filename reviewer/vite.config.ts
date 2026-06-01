@@ -5,9 +5,10 @@ import path from 'node:path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/reviewer-app/',
   build: {
-    outDir: path.resolve(__dirname, 'dist'),
+    outDir: path.resolve(__dirname, '../reviewer-app'),
     emptyOutDir: true,
+    assetsDir: 'assets',
   },
 })
