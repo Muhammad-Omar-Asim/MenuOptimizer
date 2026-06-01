@@ -65,6 +65,8 @@ export const ComparePreview: React.FC = () => {
   const [bundleError, setBundleError] = useState<string | null>(null);
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   const comments = useAllComments();
   const unresolvedComments = comments.filter((c) => !c.resolved);
@@ -290,13 +292,18 @@ export const ComparePreview: React.FC = () => {
       setPdfError('Please upload a PDF file');
       return;
     }
+    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     setUploadedPdf(file);
+    setPdfBlobUrl(URL.createObjectURL(file));
   };
 
   const handleViewPdf = () => {
     if (!uploadedPdf) return;
-    const url = URL.createObjectURL(uploadedPdf);
-    window.open(url, '_blank');
+    setPdfViewerOpen(true);
+  };
+
+  const handleClosePdfViewer = () => {
+    setPdfViewerOpen(false);
   };
 
   const formatSessionTime = (ts: number): string => {
@@ -356,6 +363,37 @@ export const ComparePreview: React.FC = () => {
                     onLoaded={(m) => setMenuB(m)}
                   />
                 </div>
+              </div>
+
+              {/* PDF Report Upload */}
+              <div className="mt-4">
+                <label className="relative flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-300 bg-white px-4 text-center transition-colors hover:border-flipdish/40">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-flipdish-muted text-flipdish">
+                      <FileUp size={16} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-neutral-900">
+                        {uploadedPdf ? `PDF Uploaded: ${uploadedPdf.name}` : 'Upload PDF Report (Optional)'}
+                      </p>
+                      <p className="text-[11px] text-neutral-500">
+                        {uploadedPdf ? 'Click View Report to display, or upload a different file' : 'Drop or click to attach a PDF report for reference'}
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handlePdfUpload(f);
+                    }}
+                  />
+                </label>
+                {pdfError && (
+                  <p className="mt-1 text-xs font-semibold text-red-600">{pdfError}</p>
+                )}
               </div>
             </div>
 
@@ -485,7 +523,7 @@ export const ComparePreview: React.FC = () => {
                 <ListChecks size={12} />
                 Show summary of changes
               </button>
-              {uploadedPdf ? (
+              {uploadedPdf && (
                 <button
                   type="button"
                   onClick={handleViewPdf}
@@ -495,23 +533,6 @@ export const ComparePreview: React.FC = () => {
                   <FileText size={12} />
                   View Report
                 </button>
-              ) : (
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50">
-                  <FileUp size={12} />
-                  Upload PDF
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handlePdfUpload(f);
-                    }}
-                  />
-                </label>
-              )}
-              {pdfError && (
-                <span className="text-xs text-red-600 font-semibold">{pdfError}</span>
               )}
             </>
           )}
@@ -689,6 +710,32 @@ export const ComparePreview: React.FC = () => {
           newMenu={menuB}
           channel={channel}
         />
+      )}
+
+      {pdfViewerOpen && pdfBlobUrl && uploadedPdf && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-4 py-3 text-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText size={18} className="shrink-0 text-flipdish" />
+              <span className="truncate text-sm font-semibold" title={uploadedPdf.name}>
+                {uploadedPdf.name}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleClosePdfViewer}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
+              title="Close PDF viewer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <iframe
+            src={pdfBlobUrl}
+            title={uploadedPdf.name}
+            className="flex-1 w-full bg-white"
+          />
+        </div>
       )}
     </div>
   );
