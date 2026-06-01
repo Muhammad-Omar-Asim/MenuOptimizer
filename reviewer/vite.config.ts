@@ -5,7 +5,7 @@ import path from 'node:path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/reviewer/',
+  base: './',
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
