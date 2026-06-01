@@ -315,6 +315,8 @@ export const ComparePreview: React.FC = () => {
   // PDF viewer popup - same modal pattern as Show Summary of Changes.
   // Rendered via createPortal so it works regardless of which view path
   // the component is in (empty state or active split preview).
+  // The dialog itself is resizable: native CSS `resize: both` lets the
+  // user drag the bottom-right corner to size it as they like.
   const pdfViewerModal = pdfViewerOpen && pdfBlobUrl && uploadedPdf
     ? createPortal(
         <div
@@ -322,14 +324,23 @@ export const ComparePreview: React.FC = () => {
           onClick={(e) => {
             if (e.target === e.currentTarget) handleClosePdfViewer();
           }}
-          className="fixed inset-0 z-[300] flex items-end justify-center bg-neutral-900/55 p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-neutral-900/55 p-4"
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="pdf-viewer-title"
-            className="flex w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl sm:rounded-2xl"
-            style={{ maxHeight: 'min(92vh, 92svh)' }}
+            className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            style={{
+              width: '85vw',
+              height: '85vh',
+              maxWidth: '1400px',
+              maxHeight: '1100px',
+              minWidth: '320px',
+              minHeight: '300px',
+              resize: 'both',
+              overflow: 'hidden',
+            }}
           >
             <header className="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-4">
               <div className="flex items-center gap-2 min-w-0">
@@ -343,15 +354,20 @@ export const ComparePreview: React.FC = () => {
                   </h2>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleClosePdfViewer}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-                title="Close PDF viewer"
-                aria-label="Close PDF viewer"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="hidden text-[10px] text-neutral-400 sm:inline" title="Drag the bottom-right corner to resize">
+                  Drag corner to resize ↘
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClosePdfViewer}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                  title="Close PDF viewer"
+                  aria-label="Close PDF viewer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </header>
             <iframe
               src={pdfBlobUrl}
