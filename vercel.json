@@ -1,4 +1,12 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false
+  "rewrites": [
+    {
+      "source": "/reviewer",
+      "destination": "/public/reviewer/index.html"
+    },
+    {
+      "source": "/reviewer/(.*)",
+      "destination": "/public/reviewer/$1"
+    }
+  ]
 }
