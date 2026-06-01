@@ -1,4 +1,18 @@
 {
   "outputDirectory": ".",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/reviewer",
+      "destination": "/reviewer-app/index.html"
+    },
+    {
+      "source": "/reviewer/",
+      "destination": "/reviewer-app/index.html"
+    },
+    {
+      "source": "/reviewer/(.*)",
+      "destination": "/reviewer-app/$1"
+    }
+  ]
 }
