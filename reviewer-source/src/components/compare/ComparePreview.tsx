@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks } from 'lucide-react';
+import { ArrowLeftRight, X, Share2, Mail, History, UploadCloud, Trash2, Clock, Lock, ListChecks, FileText, FileUp } from 'lucide-react';
 import { useStore } from '../../hooks/useStore';
 import type { NormalizedMenu, SalesChannel } from '../../types';
 import { MenuExplorer, type DiffMeta } from './MenuExplorer';
@@ -63,6 +63,8 @@ export const ComparePreview: React.FC = () => {
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+  const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const comments = useAllComments();
   const unresolvedComments = comments.filter((c) => !c.resolved);
@@ -282,6 +284,21 @@ export const ComparePreview: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handlePdfUpload = (file: File) => {
+    setPdfError(null);
+    if (file.type !== 'application/pdf') {
+      setPdfError('Please upload a PDF file');
+      return;
+    }
+    setUploadedPdf(file);
+  };
+
+  const handleViewPdf = () => {
+    if (!uploadedPdf) return;
+    const url = URL.createObjectURL(uploadedPdf);
+    window.open(url, '_blank');
+  };
+
   const formatSessionTime = (ts: number): string => {
     return new Date(ts).toLocaleDateString(undefined, {
       month: 'short',
@@ -458,15 +475,45 @@ export const ComparePreview: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {menu && menuB && (
-            <button
-              type="button"
-              onClick={() => setSummaryOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
-              title="Show summary of changes between OLD and NEW"
-            >
-              <ListChecks size={12} />
-              Show summary of changes
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+                title="Show summary of changes between OLD and NEW"
+              >
+                <ListChecks size={12} />
+                Show summary of changes
+              </button>
+              {uploadedPdf ? (
+                <button
+                  type="button"
+                  onClick={handleViewPdf}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-flipdish/30 bg-flipdish/10 px-3 py-1.5 text-xs font-semibold text-flipdish transition-colors hover:bg-flipdish/20"
+                  title={`View uploaded PDF: ${uploadedPdf.name}`}
+                >
+                  <FileText size={12} />
+                  View Report
+                </button>
+              ) : (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-50">
+                  <FileUp size={12} />
+                  Upload PDF
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handlePdfUpload(f);
+                    }}
+                  />
+                </label>
+              )}
+              {pdfError && (
+                <span className="text-xs text-red-600 font-semibold">{pdfError}</span>
+              )}
+            </>
           )}
 
           {unresolvedComments.length > 0 && !sessionSubmitted && (
