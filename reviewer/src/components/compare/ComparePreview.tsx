@@ -62,7 +62,6 @@ export const ComparePreview: React.FC = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [submitModalOpen, setSubmitModalOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [bundleError, setBundleError] = useState<string | null>(null);
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -220,68 +219,6 @@ export const ComparePreview: React.FC = () => {
       const filtered = sessions.filter((s) => s.id !== id);
       safeWrite('mjr_local_sessions_v1', filtered);
     }
-  };
-
-  const handleBundleUpload = (file: File) => {
-    setBundleError(null);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const payload = JSON.parse(String(reader.result ?? ''));
-        if (payload?.type !== 'mjr_compare_session_v1') {
-          throw new Error('Invalid file format. Please upload a valid Compare Session Bundle.');
-        }
-
-        setMenu(payload.menuA);
-        setMenuB(payload.menuB || null);
-        setReviewProductScopes(payload.scopes);
-
-        if (Array.isArray(payload.comments)) {
-          importCommentsFromJson(JSON.stringify({ comments: payload.comments }));
-        }
-
-        // If connected to Supabase, let's instantly save it to the cloud to establish sync!
-        if (isSupabaseConfigured && supabase) {
-          const { data, error } = await supabase
-            .from('compare_sessions')
-            .insert({
-              menu_a: payload.menuA,
-              menu_b: payload.menuB,
-              scopes: payload.scopes,
-            })
-            .select('id')
-            .single();
-
-          if (!error && data) {
-            const newId = data.id;
-            setShareSessionId(newId);
-            const newUrl = `${window.location.origin}${window.location.pathname}?sessionId=${newId}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-
-            if (payload.comments?.length > 0) {
-              const insertPayload = payload.comments.map((c: any) => ({
-                id: c.id,
-                session_id: newId,
-                menu_id: c.menuId,
-                item_id: c.itemId,
-                item_name: c.itemName,
-                category_name: c.categoryName || null,
-                author: c.author,
-                text: c.text,
-                resolved: c.resolved,
-                attachment_url: c.attachmentUrl || null,
-              }));
-              await supabase.from('comments').insert(insertPayload);
-            }
-          }
-        } else {
-          setShareSessionId(payload.id || 'imported');
-        }
-      } catch (err: any) {
-        setBundleError(err.message || 'Failed to parse session bundle.');
-      }
-    };
-    reader.readAsText(file);
   };
 
   const handlePdfUpload = (file: File) => {
