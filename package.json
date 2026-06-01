@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bash build.sh"
+    "vercel-build": "cd reviewer && npm install && npm run build"
   }
 }

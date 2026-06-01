@@ -1,5 +1,8 @@
 {
-  "buildCommand": "bash build.sh",
-  "outputDirectory": "public",
-  "installCommand": "echo 'Skipping root install'"
+  "rewrites": [
+    {
+      "source": "/reviewer/:path*",
+      "destination": "/reviewer/dist/:path*"
+    }
+  ]
 }
