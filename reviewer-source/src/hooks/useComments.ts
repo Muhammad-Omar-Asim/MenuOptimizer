@@ -46,13 +46,22 @@ function safeWrite(key: string, value: unknown): void {
 }
 
 const listeners = new Set<() => void>();
-// In offline mode, seed comments from localStorage once at module init so
-// that no useEffect can ever re-read stale localStorage data after a reset.
-// In Supabase mode, start empty — the session fetch in useCommentsSync fills
-// them when a sessionId is present.
-let comments: MenuComment[] = isSupabaseConfigured
-  ? []
-  : safeRead<MenuComment[]>(COMMENTS_KEY, []);
+// Always start empty. We deliberately do NOT seed from localStorage —
+// doing so would re-hydrate any comment ever made in any prior session
+// the moment the bundle loads, ghosting them onto a fresh upload before
+// the user has done anything. Comments live only in memory until a
+// session link is generated, at which point handleSaveAndShare flushes
+// the in-memory array into Supabase under the new session id.
+let comments: MenuComment[] = [];
+// Best-effort cleanup of any stale cache left over from earlier versions
+// that did persist offline comments to localStorage.
+if (typeof window !== 'undefined') {
+  try {
+    window.localStorage.removeItem(COMMENTS_KEY);
+  } catch {
+    // ignore
+  }
+}
 let reviewerName: string = safeRead<string>(REVIEWER_KEY, '') ?? '';
 // Incremented each time a fresh upload resets state. In-flight Supabase
 // fetches capture this value at start and bail if it has advanced by the
@@ -73,12 +82,10 @@ function emit() {
 }
 
 function persistComments() {
-  // Only persist to localStorage in true offline mode. When Supabase is
-  // configured it is the source of truth, and writing to localStorage just
-  // causes ghost-comment leaks across unrelated sessions.
-  if (!isSupabaseConfigured) {
-    safeWrite(COMMENTS_KEY, comments);
-  }
+  // Comments are intentionally not persisted to localStorage. They live
+  // in memory until handleSaveAndShare flushes them into Supabase under
+  // a session id. Persisting them locally re-introduces ghost comments
+  // on the next page load.
   emit();
 }
 
