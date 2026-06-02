@@ -6,6 +6,7 @@ import type {
   NormalizedModifierOption,
   SalesChannel,
 } from '../../types';
+import { freshUploadId } from './freshUploadId';
 
 const CHANNELS: SalesChannel[] = ['Collection', 'Delivery', 'DineIn', 'Takeaway'];
 
@@ -194,7 +195,7 @@ export function normalizeAdminMenuExport(raw: unknown): NormalizedMenu {
   const itemCount = categories.reduce((acc, c) => acc + c.items.length, 0);
 
   return {
-    id: menuId,
+    id: freshUploadId(),
     name: menuName,
     categories,
     modifierGroups,
