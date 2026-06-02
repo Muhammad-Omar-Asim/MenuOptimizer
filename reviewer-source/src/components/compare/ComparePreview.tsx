@@ -8,7 +8,7 @@ import { SlotUpload } from './SlotUpload';
 import { ShareSessionModal } from './ShareSessionModal';
 import { ChangeSummaryModal } from './ChangeSummaryModal';
 import { SubmitCommentsModal } from '../comments/SubmitCommentsModal';
-import { useAllComments, getSessionIdFromUrl, importCommentsFromJson } from '../../hooks/useComments';
+import { useAllComments, getSessionIdFromUrl, importCommentsFromJson, resetCommentsForFreshUpload } from '../../hooks/useComments';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { computeSessionExpiry } from '../../lib/session/sessionLifetime';
 
@@ -416,6 +416,7 @@ export const ComparePreview: React.FC = () => {
                     label="Upload OLD menu"
                     helper="The baseline menu, before changes"
                     onLoaded={(m) => {
+                      resetCommentsForFreshUpload();
                       setMenu(m);
                       setReviewProductScopes({ webApp: true, pos: false });
                     }}
@@ -425,7 +426,10 @@ export const ComparePreview: React.FC = () => {
                   <SlotUpload
                     label="Upload NEW menu"
                     helper="The updated menu — changes will be flagged here"
-                    onLoaded={(m) => setMenuB(m)}
+                    onLoaded={(m) => {
+                      resetCommentsForFreshUpload();
+                      setMenuB(m);
+                    }}
                   />
                 </div>
               </div>
@@ -743,6 +747,7 @@ export const ComparePreview: React.FC = () => {
               label="Drop OLD menu here"
               helper="The baseline menu, before changes."
               onLoaded={(m) => {
+                resetCommentsForFreshUpload();
                 setMenu(m);
                 setReviewProductScopes({ webApp: true, pos: false });
               }}
@@ -780,7 +785,10 @@ export const ComparePreview: React.FC = () => {
             <SlotUpload
               label="Drop NEW menu here"
               helper="The updated menu — changes will be flagged here."
-              onLoaded={(m) => setMenuB(m)}
+              onLoaded={(m) => {
+                resetCommentsForFreshUpload();
+                setMenuB(m);
+              }}
             />
           )}
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, AlertCircle, Monitor, Tablet, Laptop } from 'lucide-react';
 import { useStore } from '../../hooks/useStore';
+import { resetCommentsForFreshUpload } from '../../hooks/useComments';
 import {
   normalizeV3Menu,
   normalizeLegacyMenu,
@@ -49,6 +50,7 @@ export const MenuUpload: React.FC = () => {
     }
     try {
       const text = (await file.text()).replace(/^\uFEFF/, '');
+      resetCommentsForFreshUpload();
       if (file.name.endsWith('.json')) {
         const raw: unknown = JSON.parse(text);
         if (isAdminMenuExport(raw)) {
