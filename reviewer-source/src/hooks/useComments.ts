@@ -116,6 +116,41 @@ export function useMenuComments(menuId: string | string[] | null): MenuComment[]
   );
 }
 
+// Called when the user starts a fresh upload from the empty-state dashboard.
+// Strips any sessionId/runId from the URL and wipes local comment state so the
+// previous session's comments don't ghost onto items in the new menu just
+// because their itemIds happen to collide. Session-link viewing (landing on a
+// URL that already has ?sessionId=...) is unaffected — those flows load the
+// link's comments from Supabase as before.
+export function resetCommentsForFreshUpload(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      if (url.searchParams.has('sessionId')) {
+        url.searchParams.delete('sessionId');
+        changed = true;
+      }
+      if (url.searchParams.has('runId')) {
+        url.searchParams.delete('runId');
+        changed = true;
+      }
+      if (changed) {
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {
+      // ignore URL parse errors
+    }
+    try {
+      window.localStorage.removeItem(COMMENTS_KEY);
+    } catch {
+      // ignore quota / access errors
+    }
+  }
+  comments = [];
+  emit();
+}
+
 export function setReviewerName(name: string) {
   reviewerName = name.trim();
   persistReviewer();
