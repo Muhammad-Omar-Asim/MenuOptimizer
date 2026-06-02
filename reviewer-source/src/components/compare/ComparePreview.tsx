@@ -747,6 +747,7 @@ export const ComparePreview: React.FC = () => {
               label="Drop OLD menu here"
               helper="The baseline menu, before changes."
               onLoaded={(m) => {
+                resetCommentsForFreshUpload();
                 setMenu(m);
                 setReviewProductScopes({ webApp: true, pos: false });
               }}
@@ -784,7 +785,10 @@ export const ComparePreview: React.FC = () => {
             <SlotUpload
               label="Drop NEW menu here"
               helper="The updated menu — changes will be flagged here."
-              onLoaded={(m) => setMenuB(m)}
+              onLoaded={(m) => {
+                resetCommentsForFreshUpload();
+                setMenuB(m);
+              }}
             />
           )}
         </div>
