@@ -136,9 +136,19 @@ export const ComparePreview: React.FC = () => {
         const newId = data.id;
         setShareSessionId(newId);
 
-        // Save current comments associated with this new sessionId
-        if (comments.length > 0) {
-          const insertPayload = comments.map(c => ({
+        // Save current comments associated with this new sessionId.
+        // Defensive filter: only persist comments that belong to the menus
+        // currently loaded in the slots. Anything left over in memory from
+        // a previously-loaded session is dropped here so it can't ghost
+        // forward into the new shared link.
+        const currentMenuIds = [menu?.id, menuB?.id].filter((id): id is string => !!id);
+        const commentsForCurrentMenu = comments.filter((c) =>
+          currentMenuIds.some(
+            (id) => c.menuId === id || c.menuId === `A:${id}` || c.menuId === `B:${id}`,
+          ),
+        );
+        if (commentsForCurrentMenu.length > 0) {
+          const insertPayload = commentsForCurrentMenu.map(c => ({
             id: c.id,
             session_id: newId,
             menu_id: c.menuId,
