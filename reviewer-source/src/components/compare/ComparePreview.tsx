@@ -700,7 +700,7 @@ export const ComparePreview: React.FC = () => {
           Show differences
         </label>
 
-        {!isClientReview && (
+        {!isClientReview && false && (
           <button
             type="button"
             onClick={swap}
