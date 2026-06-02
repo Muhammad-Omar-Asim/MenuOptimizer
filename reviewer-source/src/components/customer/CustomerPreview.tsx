@@ -1579,6 +1579,7 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
           open={submitModalOpen}
           onClose={() => setSubmitModalOpen(false)}
           menuName={menu.name}
+          menuId={menu.id}
         />
       ) : null}
     </div>
