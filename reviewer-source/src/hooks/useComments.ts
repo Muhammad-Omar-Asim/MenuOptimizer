@@ -48,6 +48,10 @@ function safeWrite(key: string, value: unknown): void {
 const listeners = new Set<() => void>();
 let comments: MenuComment[] = [];
 let reviewerName: string = safeRead<string>(REVIEWER_KEY, '') ?? '';
+// Incremented each time a fresh upload resets state. In-flight Supabase
+// fetches capture this value at start and bail if it has advanced by the
+// time they resolve, preventing old-session comments from ghosting back.
+let uploadGeneration = 0;
 
 // Read sessionId dynamically every time we need it. It can change mid-tab
 // after "Save & Share Link" / "Submit Reviews" calls pushState to update the
@@ -123,6 +127,7 @@ export function useMenuComments(menuId: string | string[] | null): MenuComment[]
 // URL that already has ?sessionId=...) is unaffected — those flows load the
 // link's comments from Supabase as before.
 export function resetCommentsForFreshUpload(): void {
+  uploadGeneration++;
   if (typeof window !== 'undefined') {
     try {
       const url = new URL(window.location.href);
@@ -361,12 +366,13 @@ export function useCommentsSync() {
       emit();
 
       // 1. Initial Fetch
+      const fetchGeneration = uploadGeneration;
       supabase
         .from('comments')
         .select('*')
         .eq('session_id', sessionId)
         .then(({ data, error }) => {
-          if (!active) return;
+          if (!active || uploadGeneration !== fetchGeneration) return;
           if (error) {
             console.error(
               `[useCommentsSync] Error fetching comments for session ${sessionId}:`,
@@ -450,8 +456,12 @@ export function useCommentsSync() {
         .subscribe();
     } else if (!isSupabaseConfigured) {
       // True offline mode: persist locally so the user doesn't lose comments
-      // between page loads.
-      comments = safeRead<MenuComment[]>(COMMENTS_KEY, []);
+      // between page loads. Guard with the upload generation so a reset that
+      // fires before this effect runs doesn't get overwritten by stale data.
+      const gen = uploadGeneration;
+      const stored = safeRead<MenuComment[]>(COMMENTS_KEY, []);
+      if (uploadGeneration !== gen) return;
+      comments = stored;
       emit();
     } else {
       // Supabase is configured but no sessionId is in the URL yet (e.g. the
