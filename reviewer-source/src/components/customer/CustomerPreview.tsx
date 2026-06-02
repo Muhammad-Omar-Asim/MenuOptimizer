@@ -128,7 +128,13 @@ export const CustomerPreview: React.FC<CustomerPreviewProps> = ({
   const [commentItem, setCommentItem] = useState<NormalizedItem | null>(null);
 
   // Session sharing / submission (mirrors compare view)
-  const allCommentsForSession = useAllComments();
+  const allCommentsForSessionRaw = useAllComments();
+  // Defensive scope: only consider comments that belong to the currently
+  // loaded menu. Anything left over in memory from a prior session is
+  // dropped so it can't leak into shared session links or counts.
+  const allCommentsForSession = allCommentsForSessionRaw.filter(
+    (c) => c.menuId === menu?.id,
+  );
   const unresolvedCount = allCommentsForSession.filter((c) => !c.resolved).length;
   const [shareSessionId, setShareSessionId] = useState<string | null>(getSessionIdFromUrl());
   const [savingSession, setSavingSession] = useState(false);
