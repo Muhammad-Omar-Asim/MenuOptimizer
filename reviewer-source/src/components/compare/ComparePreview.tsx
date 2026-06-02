@@ -811,6 +811,7 @@ export const ComparePreview: React.FC = () => {
           open={submitModalOpen}
           onClose={() => setSubmitModalOpen(false)}
           menuName={menu?.name || 'Comparison Preview'}
+          menuId={[menu?.id, menuB?.id].filter((id): id is string => !!id)}
         />
       )}
 

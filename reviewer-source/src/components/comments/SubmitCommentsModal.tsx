@@ -10,11 +10,24 @@ interface Props {
   open: boolean;
   onClose: () => void;
   menuName: string;
+  /**
+   * Restrict the comments shown in the summary to those belonging to the
+   * current menu(s). Without this, stale comments left in the in-memory
+   * store from a previous session would appear in the submit popup even
+   * though they no longer match any item on the current menu.
+   */
+  menuId?: string | string[] | null;
 }
 
-export const SubmitCommentsModal: React.FC<Props> = ({ open, onClose, menuName }) => {
+export const SubmitCommentsModal: React.FC<Props> = ({ open, onClose, menuName, menuId }) => {
   const allComments = useAllComments();
-  const unresolved = allComments.filter((c) => !c.resolved);
+  const ids = menuId == null ? null : Array.isArray(menuId) ? menuId : [menuId];
+  const scoped = ids
+    ? allComments.filter((c) =>
+        ids.some((id) => c.menuId === id || c.menuId === `A:${id}` || c.menuId === `B:${id}`),
+      )
+    : allComments;
+  const unresolved = scoped.filter((c) => !c.resolved);
   
   const [clientName, setClientName] = useState('');
   const [submitting, setSubmitting] = useState(false);
