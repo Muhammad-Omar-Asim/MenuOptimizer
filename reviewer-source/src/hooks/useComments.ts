@@ -46,7 +46,13 @@ function safeWrite(key: string, value: unknown): void {
 }
 
 const listeners = new Set<() => void>();
-let comments: MenuComment[] = [];
+// In offline mode, seed comments from localStorage once at module init so
+// that no useEffect can ever re-read stale localStorage data after a reset.
+// In Supabase mode, start empty — the session fetch in useCommentsSync fills
+// them when a sessionId is present.
+let comments: MenuComment[] = isSupabaseConfigured
+  ? []
+  : safeRead<MenuComment[]>(COMMENTS_KEY, []);
 let reviewerName: string = safeRead<string>(REVIEWER_KEY, '') ?? '';
 // Incremented each time a fresh upload resets state. In-flight Supabase
 // fetches capture this value at start and bail if it has advanced by the
@@ -454,22 +460,14 @@ export function useCommentsSync() {
           }
         )
         .subscribe();
-    } else if (!isSupabaseConfigured) {
-      // True offline mode: persist locally so the user doesn't lose comments
-      // between page loads. Guard with the upload generation so a reset that
-      // fires before this effect runs doesn't get overwritten by stale data.
-      const gen = uploadGeneration;
-      const stored = safeRead<MenuComment[]>(COMMENTS_KEY, []);
-      if (uploadGeneration !== gen) return;
-      comments = stored;
-      emit();
     } else {
-      // Supabase is configured but no sessionId is in the URL yet (e.g. the
-      // user just landed on "/"). Start with a clean slate — otherwise
-      // comments saved to localStorage during a previous session would leak
-      // into a fresh upload as ghost feedback.
-      comments = [];
-      emit();
+      // Supabase is configured but no sessionId is in the URL — clean slate.
+      // Offline mode comments are seeded at module init, not here, so there
+      // is no localStorage read that could race with resetCommentsForFreshUpload.
+      if (isSupabaseConfigured) {
+        comments = [];
+        emit();
+      }
     }
 
     return () => {
