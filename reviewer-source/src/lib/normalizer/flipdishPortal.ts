@@ -7,6 +7,7 @@ import type {
   SalesChannel,
 } from '../../types';
 import { isAdminMenuExport } from './adminExport';
+import { freshUploadId } from './freshUploadId';
 
 const CHANNELS: SalesChannel[] = ['Collection', 'Delivery', 'DineIn', 'Takeaway'];
 
@@ -186,7 +187,7 @@ export function normalizeFlipdishPortalMenu(raw: unknown): NormalizedMenu {
   const itemCount = categories.reduce((acc, c) => acc + c.items.length, 0);
 
   return {
-    id: menuId,
+    id: freshUploadId(),
     name: menuName,
     categories,
     modifierGroups,

@@ -1,8 +1,8 @@
-import type { 
-  NormalizedMenu, 
-  NormalizedCategory, 
-  NormalizedItem, 
-  NormalizedModifierGroup, 
+import type {
+  NormalizedMenu,
+  NormalizedCategory,
+  NormalizedItem,
+  NormalizedModifierGroup,
   NormalizedModifierOption,
   RawMenuV3,
   RawCategoryV3,
@@ -14,6 +14,8 @@ import type {
 
 export { isAdminMenuExport, normalizeAdminMenuExport } from './adminExport';
 export { isFlipdishPortalMenu, normalizeFlipdishPortalMenu } from './flipdishPortal';
+export { freshUploadId } from './freshUploadId';
+import { freshUploadId } from './freshUploadId';
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -70,7 +72,7 @@ export function normalizeV3Menu(raw: RawMenuV3): NormalizedMenu {
   const channels: SalesChannel[] = ['Collection', 'Delivery', 'DineIn', 'Takeaway'];
 
   return {
-    id: raw.id || 'unknown',
+    id: freshUploadId(),
     name: raw.name || 'Unnamed Menu',
     categories,
     modifierGroups,
@@ -263,7 +265,7 @@ export function normalizeLegacyMenu(text: string): NormalizedMenu {
   });
 
   return {
-    id: 'legacy-' + Date.now(),
+    id: freshUploadId(),
     name: 'Legacy Menu Export',
     categories,
     modifierGroups: {},
